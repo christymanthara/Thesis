@@ -1,4 +1,5 @@
-git submodule add https://github.com/christymanthara/Papers-Referenced.git papers/referenced
-git submodule add https://github.com/christymanthara/Implementation.git implementation
-git submodule add https://github.com/christymanthara/Datasets.git datasets
-git submodule add https://github.com/christymanthara/Benchmark-Papers.git benchmark/papers
+To clone the repository along with its submodules, use the following command:
+
+```bash
+git clone --recurse-submodules https://github.com/christymanthara/Thesis.git
+```
