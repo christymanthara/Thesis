@@ -1,0 +1,12 @@
+[submodule "papers/referenced"]
+	path = papers/referenced
+	url = https://github.com/christymanthara/Papers-Referenced.git
+[submodule "implementation"]
+	path = implementation
+	url = https://github.com/christymanthara/Implementation.git
+[submodule "datasets"]
+	path = datasets
+	url = https://github.com/christymanthara/Datasets.git
+[submodule "benchmark/papers"]
+	path = benchmark/papers
+	url = https://github.com/christymanthara/Benchmark-Papers.git
