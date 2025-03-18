@@ -19,17 +19,17 @@ def tsne_pavlin(file1, file2, output_pdf="tsne_plot.pdf"):
     adata = anndata.read_h5ad(path.join("..", "datasets", file1))
     new = anndata.read_h5ad(path.join("..", "datasets", file2))
     
-    adata.obs["source"] = "Dataset 1"
-    new.obs["source"] = "Dataset 2"
+    adata.obs["source"] = file1
+    new.obs["source"] = file2
     
-    cell_mask = new.obs["labels"].isin(adata.obs["labels"])
+    cell_mask = new.obs["labels"].isin(adata.obs["labels"]) #to be added to the arguments
     new = new[cell_mask].copy()
     
     full = adata.concatenate(new)
     sc.pp.filter_genes(full, min_counts=1)
     
     adata_norm = full.copy()
-    sc.pp.normalize_per_cell(adata_norm, counts_per_cell_after=1_000_000)
+    sc.pp.normalize_per_cell(adata_norm, counts_per_cell_after=1_000_000) #add to argument
     sc.pp.log1p(adata_norm)
     
     adata_norm.X = adata_norm.X.toarray()
@@ -53,12 +53,12 @@ def tsne_pavlin(file1, file2, output_pdf="tsne_plot.pdf"):
         n_jobs=8,
     )
     embedding.optimize(n_iter=250, exaggeration=12, momentum=0.5, inplace=True)
+    embedding.optimize(n_iter=750, exaggeration=1, momentum=0.8, inplace=True)
     
-    plt.figure(figsize=(8, 8))
-    plt.scatter(embedding[:, 0], embedding[:, 1], c=full.obs["source"].astype("category").cat.codes, cmap="viridis", alpha=0.7)
-    plt.colorbar(label="Dataset Source")
-    plt.title("t-SNE Visualization")
-    plt.xlabel("t-SNE 1")
-    plt.ylabel("t-SNE 2")
-    plt.savefig(output_pdf)
-    plt.close()
+    # utils.plot(embedding, full.obs["source"])
+    # plt.savefig("output_plot.pdf", format="pdf", bbox_inches="tight")
+    # plt.close()
+    utils.plot(embedding, full.obs["source"],save_path="tsne_plot.pdf")
+
+if __name__ == "__main__":
+    tsne_pavlin("baron_2016h.h5ad", "xin_2016.h5ad")
