@@ -16,9 +16,22 @@ from sklearn import decomposition
 import matplotlib.pyplot as plt
 
 def tsne_pavlin(file1, file2, output_pdf="tsne_plot.pdf"):
-    adata = anndata.read_h5ad(path.join("..", "datasets", file1))
-    new = anndata.read_h5ad(path.join("..", "datasets", file2))
+    # adata = anndata.read_h5ad(path.join("..", "datasets", file1))
+    # new = anndata.read_h5ad(path.join("..", "datasets", file2))
     
+    """
+    Loads two AnnData files, merges them, computes tsne, and saves the plot as a PDF.
+    
+    Parameters:
+    - file1 (str): Path to the first .h5ad file.
+    - file2 (str): Path to the second .h5ad file.
+    - output_file (str): Path where the tsne plot should be saved.
+    """
+
+    # Load the datasets
+    adata = anndata.read_h5ad(file1)
+    new = anndata.read_h5ad(file2)
+
     adata.obs["source"] = file1
     new.obs["source"] = file2
     
@@ -60,5 +73,6 @@ def tsne_pavlin(file1, file2, output_pdf="tsne_plot.pdf"):
     # plt.close()
     utils.plot(embedding, full.obs["source"],save_path="tsne_plot.pdf")
 
+
 if __name__ == "__main__":
-    tsne_pavlin("baron_2016h.h5ad", "xin_2016.h5ad")
+    tsne_pavlin("../datasets/baron_2016h.h5ad", "../datasets/xin_2016.h5ad")
