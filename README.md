@@ -26,3 +26,6 @@ git submodule update --remote
 ```
 for datasets use the link below
 https://hemberg-lab.github.io/scRNA.seq.datasets/human/pancreas/
+
+
+change normalization from million to a 10000
