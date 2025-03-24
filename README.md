@@ -7,7 +7,7 @@ This repository serves as the main repository for my thesis, which focuses on co
 The repository is organized into the following submodules:
 
 - **`papers/referenced`**: Contains the papers that are referenced in the thesis.
-- **`implementation`**: Includes the implementations of the methods discussed in the referenced papers.
+- **`scripts`**: Includes the implementations of the methods discussed in the referenced papers.
 - **`datasets`**: Contains the datasets used for analysis in the thesis.
 - **`benchmark/papers`**: Includes the papers that will be analyzed for benchmarking purposes.
 
