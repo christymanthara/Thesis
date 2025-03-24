@@ -3,6 +3,8 @@
 ## Overview
 This repository contains various scripts for processing, analyzing, and visualizing single-cell RNA sequencing (scRNA-seq) data using AnnData, Scanpy, openTSNE, and UMAP.
 
+Make sure that you download the datasets and follow the instructions in the datasets subrepo before you proceed with the scripts here.
+
 ## Scripts
 
 ### `scv_h5ad.py`
@@ -55,4 +57,5 @@ python scripts/pavlin_plot_on_top.py
 python scripts/show_batch_effect.py
 python scripts/umap_plot.py
 ```
-
+### Data Utils
+This is a package that handles the common preprocessing steps we have used here.

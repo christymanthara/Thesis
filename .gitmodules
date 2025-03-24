@@ -2,3 +2,6 @@
 	path = papers/referenced
 	url = https://github.com/christymanthara/Papers-Referenced.git
 
+[submodule "Datasets"]
+	path = Datasets
+	url = https://github.com/christymanthara/Datasets
