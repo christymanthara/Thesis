@@ -67,12 +67,14 @@ def run_gene_preprocess_pipeline(file_path):
     # compute_tsne([adata_250, adata_3000, adata_full])
     compute_pca([adata_250])
     compute_tsne([adata_250])
+    compute_pca([adata_3000,adata_full])
+    compute_tsne([adata_3000,adata_full])
 
     # Save processed data
     adata_250.write_h5ad(f"{file_name}_embedding_tsne_250_genes.h5ad")
     # adata_250.write_h5ad("test_embedding_tsne_250_genes.h5ad")
-    # adata_3000.write_h5ad("baron_embedding_tsne_3000_genes.h5ad")
-    # adata_full.write_h5ad("baron_embedding_tsne_all_genes.h5ad")
+    adata_3000.write_h5ad("{file_name}_embedding_tsne_3000_genes.h5ad")
+    adata_full.write_h5ad("{file_name}_embedding_tsne_all_genes.h5ad")
 
 if __name__ == "__main__":
     run_gene_preprocess_pipeline("../datasets/baron_2016h.h5ad")

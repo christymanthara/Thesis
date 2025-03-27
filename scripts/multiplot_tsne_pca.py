@@ -79,11 +79,11 @@ def multiplot_tsne_pca(file_names: list):
 if __name__ == "__main__":
     # Example usage:
     # For a single file:
-    multiplot_tsne_pca(["baron_2016h_embedding_tsne_250_genes.h5ad"])
+    # multiplot_tsne_pca(["baron_2016h_embedding_tsne_250_genes.h5ad"])
     
     # For multiple files, uncomment and modify as needed:
-    # multiplot_tsne_pca([
-    #     "baron_2016h_embedding_tsne_250_genes.h5ad",
-    #     "baron_2016h_embedding_tsne_3000_genes.h5ad",
-    #     "baron_2016h_embedding_tsne_all_genes.h5ad"
-    # ])
+    multiplot_tsne_pca([
+        "baron_2016h_embedding_tsne_250_genes.h5ad",
+        "baron_2016h_embedding_tsne_3000_genes.h5ad",
+        "baron_2016h_embedding_tsne_all_genes.h5ad"
+    ])
