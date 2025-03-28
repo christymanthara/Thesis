@@ -6,3 +6,4 @@ scripts/__pycache__
 implementation
 scripts/list_data_files.py
 scripts/*.h5ad
+scripts/test_transform2.py
