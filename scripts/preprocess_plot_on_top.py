@@ -53,7 +53,7 @@ def compute_tsne(adata_list):
         )
         embedding.optimize(n_iter=250, exaggeration=12, momentum=0.5, inplace=True)
         embedding.optimize(n_iter=750, exaggeration=1, momentum=0.8, inplace=True)
-        adata_.obsm["tsne"] = np.array(embedding)
+        adata_.obsm["X_tsne"] = np.array(embedding)
 
 def run_gene_preprocess_pipeline(file_path):
     file_name = path.splitext(path.basename(file_path))[0]
@@ -63,19 +63,22 @@ def run_gene_preprocess_pipeline(file_path):
     adata_full = preprocess_anndata(file_path)
     
     # Compute PCA and t-SNE
-    # compute_pca([adata_250, adata_3000, adata_full])
-    # compute_tsne([adata_250, adata_3000, adata_full])
-    compute_pca([adata_250])
-    compute_tsne([adata_250])
-    compute_pca([adata_3000,adata_full])
-    compute_tsne([adata_3000,adata_full])
+    compute_pca([adata_250, adata_3000, adata_full])
+    compute_tsne([adata_250, adata_3000, adata_full])
+    # compute_pca([adata_250])
+    # compute_tsne([adata_250])
+    # compute_pca([adata_3000,adata_full])
+    # compute_tsne([adata_3000,adata_full])
 
     # Save processed data
     adata_250.write_h5ad(f"{file_name}_embedding_tsne_250_genes.h5ad")
-    # adata_250.write_h5ad("test_embedding_tsne_250_genes.h5ad")
-    adata_3000.write_h5ad("{file_name}_embedding_tsne_3000_genes.h5ad")
-    adata_full.write_h5ad("{file_name}_embedding_tsne_all_genes.h5ad")
+    adata_3000.write_h5ad(f"{file_name}_embedding_tsne_3000_genes.h5ad")
+    adata_full.write_h5ad(f"{file_name}_embedding_tsne_all_genes.h5ad")
+
+    #returning the data created.
+    return adata_250, adata_3000, adata_full
 
 if __name__ == "__main__":
-    run_gene_preprocess_pipeline("../datasets/baron_2016h.h5ad")
+    run_gene_preprocess_pipeline("../Datasets/baron_2016h.h5ad")
+    # run_gene_preprocess_pipeline("../Datasets/xin_2016.h5ad")
 
