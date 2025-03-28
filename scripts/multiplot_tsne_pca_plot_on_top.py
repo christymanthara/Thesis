@@ -2,7 +2,13 @@ import anndata
 import numpy as np
 import matplotlib.pyplot as plt
 import utils
+import os
 from matplotlib.backends.backend_pdf import PdfPages
+
+
+def get_common_prefix(file_names):
+    """Returns the common prefix of the provided file names."""
+    return os.path.commonprefix(file_names).rstrip("_")
 
 def multiplot_tsne_pca(file_names: list):
     """
@@ -14,17 +20,14 @@ def multiplot_tsne_pca(file_names: list):
         file_names (list): List of file names (strings) to process.
     """
     ncols = len(file_names)
-    
-    # Generate a PDF file name
-    if ncols == 1:
-        pdf_file = file_names[0].replace(".h5ad", "_tsne_plot.pdf")
-    else:
-        pdf_file = "combined_tsne_plot.pdf"
+
+    # Extract common prefix for naming the output file
+    common_prefix = get_common_prefix([os.path.basename(f) for f in file_names])
+    pdf_file = f"{common_prefix}_tsne_plot.pdf"
 
     with PdfPages(pdf_file) as pdf:
         # PCA Plot Page
         fig, ax = plt.subplots(ncols=ncols, figsize=(8 * ncols, 8))
-        # Ensure ax is iterable when there's only one subplot
         if ncols == 1:
             ax = [ax]
         for i, file_name in enumerate(file_names):
@@ -32,7 +35,6 @@ def multiplot_tsne_pca(file_names: list):
             legend_kwargs = dict(loc="center", bbox_to_anchor=(0.5, -0.05), 
                                  ncol=len(np.unique(adata.obs["labels"])))
             colors = utils.get_colors_for(adata)
-            # Use legend only for the second subplot if available
             draw_legend = (i == 1)
             utils.plot(adata.obsm["pca"],
                        adata.obs["labels"],
@@ -48,7 +50,7 @@ def multiplot_tsne_pca(file_names: list):
                        fontsize=15, fontweight="bold")
         pdf.savefig(fig)
         plt.close(fig)
-        
+
         # t-SNE Plot Page
         fig, ax = plt.subplots(ncols=ncols, figsize=(8 * ncols, 8))
         if ncols == 1:
@@ -59,7 +61,7 @@ def multiplot_tsne_pca(file_names: list):
                                  ncol=len(np.unique(adata.obs["labels"])))
             colors = utils.get_colors_for(adata)
             draw_legend = (i == 1)
-            utils.plot(adata.obsm["tsne"],
+            utils.plot(adata.obsm["X_tsne"],
                        adata.obs["labels"],
                        s=2,
                        colors=colors,
@@ -73,7 +75,7 @@ def multiplot_tsne_pca(file_names: list):
                        fontsize=15, fontweight="bold")
         pdf.savefig(fig)
         plt.close(fig)
-        
+
     print(f"Plots saved as {pdf_file}")
 
 if __name__ == "__main__":
