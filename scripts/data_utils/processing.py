@@ -1,6 +1,7 @@
 import anndata
 import scanpy as sc
 import os
+import pandas as pd  # Ensure pandas handles string assignments correctly
 from sklearn import decomposition
 
 def load_and_preprocess(file1, file2, label_column="labels", use_basename=True):
@@ -8,27 +9,30 @@ def load_and_preprocess(file1, file2, label_column="labels", use_basename=True):
     Loads two AnnData files, assigns source labels, filters matching cells based on a given column,
     concatenates them, filters genes, normalizes, log-transforms, standardizes,
     and computes PCA. Returns the processed AnnData object.
-    
-    Parameters:
-    - file1 (str): Path to the first .h5ad file.
-    - file2 (str): Path to the second .h5ad file.
-    - label_column (str): The column name in `obs` used to filter matching cells.
-    - use_basename (bool): If True, use os.path.basename for source labels. Otherwise, use the full file paths.
-    
-    Returns:
-    - full (AnnData): The processed, concatenated AnnData object with PCA computed.
     """
     # Load the datasets
     adata = anndata.read_h5ad(file1)
     new = anndata.read_h5ad(file2)
 
-    # Set source labels based on the flag
+    # Debug print to check file paths
+    print(f"file1 path: {file1}")
+    print(f"file2 path: {file2}")
+
+    # Extract just the filename before ".h5ad"
+    def extract_filename(path):
+        filename = os.path.basename(path)  # Get file name
+        return filename.rsplit('.h5ad', 1)[0]  # Remove the extension
+
     if use_basename:
-        adata.obs["source"] = os.path.basename(file1)
-        new.obs["source"] = os.path.basename(file2)
+        adata.obs["source"] = pd.Categorical([extract_filename(file1)] * adata.n_obs)
+        new.obs["source"] = pd.Categorical([extract_filename(file2)] * new.n_obs)
     else:
-        adata.obs["source"] = file1
-        new.obs["source"] = file2
+        adata.obs["source"] = pd.Categorical([file1] * adata.n_obs)
+        new.obs["source"] = pd.Categorical([file2] * new.n_obs)
+
+    # Debug print to check source labels
+    print("Unique source labels in adata:", adata.obs["source"].unique())
+    print("Unique source labels in new:", new.obs["source"].unique())
 
     # Filter new data: keep only cells whose label_column values exist in adata
     if label_column in new.obs and label_column in adata.obs:
@@ -43,6 +47,7 @@ def load_and_preprocess(file1, file2, label_column="labels", use_basename=True):
 
     # Normalize and log-transform
     adata_norm = full.copy()
+    adata_norm.X = adata_norm.X.astype(float)
     sc.pp.normalize_per_cell(adata_norm, counts_per_cell_after=1_000_000)
     sc.pp.log1p(adata_norm)
 
@@ -53,5 +58,5 @@ def load_and_preprocess(file1, file2, label_column="labels", use_basename=True):
 
     # Compute PCA and store in obsm
     full.obsm["X_pca"] = decomposition.PCA(n_components=50).fit_transform(adata_norm.X)
-    
+
     return full
