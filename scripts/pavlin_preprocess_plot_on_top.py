@@ -79,6 +79,7 @@ def run_gene_preprocess_pipeline(file_path):
     return adata_250, adata_3000, adata_full
 
 if __name__ == "__main__":
-    run_gene_preprocess_pipeline("../Datasets/baron_2016h.h5ad")
-    run_gene_preprocess_pipeline("../Datasets/xin_2016.h5ad")
-
+    # run_gene_preprocess_pipeline("../Datasets/baron_2016h.h5ad")
+    # run_gene_preprocess_pipeline("../Datasets/xin_2016.h5ad")
+      run_gene_preprocess_pipeline("Datasets/baron_2016h.h5ad") #when running from the root directory
+      run_gene_preprocess_pipeline("Datasets/xin_2016.h5ad")

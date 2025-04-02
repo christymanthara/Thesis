@@ -93,4 +93,5 @@ def multiplot_transform(adata_path: str, new_path: str):
     print(f"Plot saved as {output_pdf}")
 
 if __name__ == "__main__":
-    multiplot_transform("../Datasets/baron_2016h.h5ad", "../Datasets/xin_2016.h5ad")
+    # multiplot_transform("../Datasets/baron_2016h.h5ad", "../Datasets/xin_2016.h5ad")
+    multiplot_transform("Datasets/baron_2016h.h5ad", "Datasets/xin_2016.h5ad") #use when running from the root directory
