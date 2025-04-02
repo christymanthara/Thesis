@@ -80,5 +80,5 @@ def run_gene_preprocess_pipeline(file_path):
 
 if __name__ == "__main__":
     run_gene_preprocess_pipeline("../Datasets/baron_2016h.h5ad")
-    # run_gene_preprocess_pipeline("../Datasets/xin_2016.h5ad")
+    run_gene_preprocess_pipeline("../Datasets/xin_2016.h5ad")
 

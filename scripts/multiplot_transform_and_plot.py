@@ -6,7 +6,7 @@ from openTSNE import affinity, TSNEEmbedding
 import utils
 import os
 
-from scripts.pavlin_preprocess_plot_on_top import run_gene_preprocess_pipeline
+from pavlin_preprocess_plot_on_top import run_gene_preprocess_pipeline
 
 def multiplot_transform(adata_path: str, new_path: str):
     adata = anndata.read_h5ad(adata_path)
