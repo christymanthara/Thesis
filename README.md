@@ -37,7 +37,7 @@ Make sure that you download the datasets and follow the instructions in the data
 
 ## Scripts
 
-### `scv_h5ad.py`
+### `csv_h5ad.py`
 Converts .csv.gz files extracted from a .tar archive into AnnData (.h5ad) format.
 - Extracts .csv.gz files from a .tar archive.
 - Converts expression data to a sparse matrix format.
@@ -57,24 +57,27 @@ Performs t-SNE visualization for comparing two datasets.
 - Computes t-SNE embeddings using openTSNE with multiscale perplexities.
 - Saves the t-SNE plot as a PDF.
 
-### `pavlin_plot_on_top.py`
+### `pavlin_preprocess_plot_on_top.py`
 Preprocesses gene expression data and computes embeddings.
 - Normalizes and log-transforms the data.
 - Selects genes based on variance.
 - Computes PCA and t-SNE embeddings.
 - Saves the processed data as .h5ad files.
 
-### `show_batch_effect.py`
-Visualizes batch effects using t-SNE or UMAP.
-- Calls `pavlin_alignment.py` for t-SNE visualization.
-- Calls `umap_plot.py` for UMAP visualization.
-- Allows switching between t-SNE and UMAP methods.
 
 ### `umap_plot.py`
 Computes and plots UMAP embeddings for two datasets.
 - Loads and preprocesses two .h5ad datasets.
 - Computes UMAP projections.
 - Saves the UMAP plot as a PDF.
+
+### `show_batch_effect_1_concatenated_datasets.py`
+Visualizes batch effects using t-SNE or UMAP.
+- Calls `pavlin_alignment.py` for t-SNE visualization.
+- Calls `umap_plot.py` for UMAP visualization.
+- Allows switching between t-SNE and UMAP methods.
+
+## Batch Effects2
 
 ## Usage
 
@@ -83,10 +86,8 @@ Run each script individually with Python. Modify file paths as needed for specif
 ```bash
 python scripts/scv_h5ad.py
 python scripts/data_stats.py
-python scripts/pavlin_alignment.py
-python scripts/pavlin_plot_on_top.py
-python scripts/show_batch_effect.py
-python scripts/umap_plot.py
+python scripts/pavlin_preprocess_plot_on_top.py
+python scripts/show_batch_effect_1_concatenated_datasets.py
 ```
 
 ### Data Utils
