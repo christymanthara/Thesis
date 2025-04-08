@@ -9,3 +9,6 @@ scripts/*.h5ad
 scripts/test_transform2.py
 
 scripts/*.ipynb
+
+*.h5ad
+*.pdf

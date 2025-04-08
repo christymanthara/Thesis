@@ -126,8 +126,13 @@ python scripts/show_batch_effect_1_concatenated_datasets.py
 # Step 1: Preprocess the reference dataset and compute embeddings
 python scripts/pavlin_preprocess_plot_on_top.py
 
-# Step 2: Transform new dataset into the reference embedding space
-python scripts/multiplot_transform_and_plot.py
+# Step 2: Transform new dataset into the reference embedding space based on tsne
+python scripts/multiplot_transform_and_plot_tsne.py
+
+
+# Step 2.1: Transform new dataset into the reference embedding space based on umap
+python scripts/multiplot_transform_and_plot_umap.py
+
 
 # Step 3: Generate visualizations of the embeddings
 python scripts/multiplot_tsne_pca_plot_on_top.py
