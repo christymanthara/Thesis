@@ -123,4 +123,4 @@ def multiplot_transform_tsne(adata_path: str, new_path: str):
 
 if __name__ == "__main__":
     # multiplot_transform("../Datasets/baron_2016h.h5ad", "../Datasets/xin_2016.h5ad")
-    multiplot_transform("datasets/baron_2016h.h5ad", "datasets/xin_2016.h5ad") #use when running from the root directory
+    multiplot_transform_tsne("datasets/baron_2016h.h5ad", "datasets/xin_2016.h5ad") #use when running from the root directory
