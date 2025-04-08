@@ -11,8 +11,14 @@ import utils
 def multiplot_transform_umap(adata_path: str, new_path: str):
     adata = anndata.read_h5ad(adata_path)
     new = anndata.read_h5ad(new_path)
+
+    print("Original labels in new (before filtering):", new.obs["labels"].value_counts())
+    print("Original labels in adata (before filtering):", adata.obs["labels"].value_counts())
+    
     
     shared_genes = adata.var_names[adata.var_names.isin(new.var_names)]
+    # print(f"Shared genes: {len(shared_genes)}")
+    # print(f"Shared genes: {shared_genes}")
     adata = adata[:, adata.var_names.isin(shared_genes)]
     new = new[:, new.var_names.isin(shared_genes)]
     
@@ -30,6 +36,7 @@ def multiplot_transform_umap(adata_path: str, new_path: str):
     new_250 = new[:, gene_mask_250].copy()
     new_1000 = new[:, gene_mask_1000].copy()
     new_full = new
+
 
 
     # Run UMAP on original data to get adata.obsm["X_umap"]
@@ -51,12 +58,18 @@ def multiplot_transform_umap(adata_path: str, new_path: str):
         embedding = reducer.fit_transform(X)
 
         new_.obsm["X_umap"] = embedding
+        print(f"the values are {adata.obs['labels']}")
+
+        # print(f"the values are {new.obs['labels']}")
+
+        # print(f"the values of new.obs['labels'] are {new.obs['labels']}")
+        # print(f"the values of new_.obs['labels'] are {new_.obs['labels']}")
 
         embedding_metrics = clustering_metrics.calculate_clustering_metrics(
             embedding,
-            # new_.obs["labels"]
+            new_.obs["labels"]
             # new.obs["labels"].to_numpy() if hasattr(new.obs["labels"], 'to_numpy') else new.obs["labels"]
-            new.obs["labels"].values
+            # adata.obs["labels"].values
         )
 
         gene_key = str(genes)
@@ -77,7 +90,16 @@ def multiplot_transform_umap(adata_path: str, new_path: str):
     new_1000 = anndata.read_h5ad("new_embedding_umap_1000_genes.h5ad")
     new_full = anndata.read_h5ad("new_embedding_umap_all_genes.h5ad")
 
-    colors = utils.get_colors_for(new_full)
+    colors = utils.get_colors_for(adata)
+    print(f"Colors: {colors}")
+    classes = adata.obs["labels"].cat.categories  # or sorted(adata.obs["labels"].unique())
+
+    print("Unique labels in new_250:", new_250.obs["labels"].unique())
+    print("Unique labels in new_1000:", new_1000.obs["labels"].unique())
+    print("Unique labels in new_full:", new_full.obs["labels"].unique())
+
+    print("Original labels in new (before filtering):", new.obs["labels"].value_counts())
+
 
     fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(16, 16))
 
@@ -87,18 +109,19 @@ def multiplot_transform_umap(adata_path: str, new_path: str):
 
 
 
-    utils.plot(adata_full.obsm["X_umap"], adata.obs["labels"], s=3, colors=colors, draw_legend=False, ax=ax[0, 0], alpha=0.1, title="Initialization", label_order=list(colors.keys()))
-    utils.plot(new_250.obsm["X_umap"], new.obs["labels"], s=12, colors=colors, draw_legend=False, ax=ax[0, 0], alpha=1, title="250 genes", label_order=list(colors.keys()))
+
+    utils.plot(adata_full.obsm["X_umap"], adata.obs["labels"], s=3, colors=colors,classes=classes, draw_legend=False, ax=ax[0, 0], alpha=0.1, title="Initialization", label_order=list(colors.keys()))
+    utils.plot(new_250.obsm["X_umap"], new.obs["labels"], s=12, colors=colors,classes=classes, draw_legend=False, ax=ax[0, 0], alpha=1, title="Initialization", label_order=list(colors.keys()))
     
-    utils.plot(adata_full.obsm["X_umap"], adata.obs["labels"], s=3, colors=colors, draw_legend=False, ax=ax[0, 1], alpha=0.1, title="250 genes", label_order=list(colors.keys()))
-    utils.plot(new_250.obsm["X_umap"], new_250.obs["labels"], s=12, colors=colors, draw_legend=False, ax=ax[0, 1], alpha=1, title="250 genes", label_order=list(colors.keys()))
+    utils.plot(adata_full.obsm["X_umap"], adata.obs["labels"], s=3, colors=colors,classes=classes, draw_legend=False, ax=ax[0, 1], alpha=0.1, title="250 genes", label_order=list(colors.keys()))
+    utils.plot(new_250.obsm["X_umap"], new_250.obs["labels"], s=12, colors=colors,classes=classes, draw_legend=False, ax=ax[0, 1], alpha=1, title="250 genes", label_order=list(colors.keys()))
     
-    utils.plot(adata_full.obsm["X_umap"], adata.obs["labels"], s=3, colors=colors, draw_legend=False, ax=ax[1, 0], alpha=0.1, title="1000 genes", label_order=list(colors.keys()))
-    utils.plot(new_1000.obsm["X_umap"], new_1000.obs["labels"], s=12, colors=colors, draw_legend=False, ax=ax[1, 0], alpha=1, title="1000 genes", label_order=list(colors.keys()))
+    utils.plot(adata_full.obsm["X_umap"], adata.obs["labels"], s=3, colors=colors,classes=classes, draw_legend=False, ax=ax[1, 0], alpha=0.1, title="1000 genes", label_order=list(colors.keys()))
+    utils.plot(new_1000.obsm["X_umap"], new_1000.obs["labels"], s=12, colors=colors,classes=classes, draw_legend=False, ax=ax[1, 0], alpha=1, title="1000 genes", label_order=list(colors.keys()))
     
-    utils.plot(adata_full.obsm["X_umap"], adata.obs["labels"], s=3, colors=colors, draw_legend=True, ax=ax[1, 1], alpha=0.1, title="All genes", label_order=list(colors.keys()),
+    utils.plot(adata_full.obsm["X_umap"], adata.obs["labels"], s=3, colors=colors,classes=classes, draw_legend=True, ax=ax[1, 1], alpha=0.1, title="All genes", label_order=list(colors.keys()),
             legend_kwargs=dict(bbox_transform=fig.transFigure, loc="lower center", bbox_to_anchor=(0.5, 0.075), ncol=len(np.unique(adata.obs["labels"]))))
-    utils.plot(new_full.obsm["X_umap"], new_full.obs["labels"], s=12, colors=colors, draw_legend=True, ax=ax[1, 1], alpha=1, title="All genes", label_order=list(colors.keys()),
+    utils.plot(new_full.obsm["X_umap"], new_full.obs["labels"], s=12, colors=colors,classes=classes, draw_legend=True, ax=ax[1, 1], alpha=1, title="All genes", label_order=list(colors.keys()),
                legend_kwargs=dict(bbox_transform=fig.transFigure, loc="lower center", bbox_to_anchor=(0.5, 0.075), ncol=len(np.unique(adata.obs["labels"]))))
 
     filename1 = os.path.splitext(os.path.basename(adata_path))[0]

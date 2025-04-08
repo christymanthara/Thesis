@@ -194,51 +194,60 @@ def plot(
     colors=None,
     legend_kwargs=None,
     label_order=None,
-    save_path=None,  # ✅ New parameter for saving
+    classes=None,  # ✅ New
+    save_path=None,
     **kwargs
 ):
     import matplotlib.pyplot as plt
     import matplotlib
+    import numpy as np
 
     if ax is None:
-        fig, ax = plt.subplots(figsize=(8, 8))  # ✅ Store figure for saving
+        fig, ax = plt.subplots(figsize=(8, 8))
     else:
-        fig = None  # If ax is provided externally, don't create a new figure
+        fig = None
 
     if title is not None:
         ax.set_title(title)
 
     plot_params = {"alpha": kwargs.get("alpha", 0.6), "s": kwargs.get("s", 1)}
 
-    # Create main plot
-    if label_order is not None:
-        assert all(np.isin(np.unique(y), label_order))
+    y = np.array(y)
+
+    # ✅ Determine classes
+    if classes is not None:
+        assert all(np.isin(np.unique(y), classes)), "Some labels in y are not in provided classes"
+        classes = list(classes)
+    elif label_order is not None:
+        assert all(np.isin(np.unique(y), label_order)), "Some labels in y are not in label_order"
         classes = [l for l in label_order if l in np.unique(y)]
     else:
-        classes = np.unique(y)
+        classes = list(np.unique(y))
 
+    # ✅ Handle colors
     if colors is None:
         default_colors = matplotlib.rcParams["axes.prop_cycle"]
         colors = {k: v["color"] for k, v in zip(classes, default_colors())}
-
-    point_colors = list(map(colors.get, y))
+    
+    point_colors = [colors.get(label, "#CCCCCC") for label in y]  # fallback color if missing
 
     ax.scatter(x[:, 0], x[:, 1], c=point_colors, rasterized=True, **plot_params)
 
-    # Plot mediods
+    # ✅ Draw cluster centers
     if draw_centers:
         centers = []
         for yi in classes:
-            mask = yi == y
+            mask = y == yi
+            if np.sum(mask) == 0:
+                continue
             centers.append(np.median(x[mask, :2], axis=0))
         centers = np.array(centers)
 
-        center_colors = list(map(colors.get, classes))
+        center_colors = [colors[c] for c in classes if c in colors]
         ax.scatter(
             centers[:, 0], centers[:, 1], c=center_colors, s=48, alpha=1, edgecolor="k"
         )
 
-        # Draw mediod labels
         if draw_cluster_labels:
             for idx, label in enumerate(classes):
                 ax.text(
@@ -249,36 +258,27 @@ def plot(
                     horizontalalignment="center",
                 )
 
-    # Hide ticks and axis
     ax.set_xticks([]), ax.set_yticks([]), ax.axis("off")
 
     if draw_legend:
         legend_handles = [
             matplotlib.lines.Line2D(
-                [],
-                [],
-                marker="s",
-                color="w",
-                markerfacecolor=colors[yi],
-                ms=10,
-                alpha=1,
-                linewidth=0,
-                label=yi,
-                markeredgecolor="k",
+                [], [], marker="s", color="w", markerfacecolor=colors[cls],
+                ms=10, alpha=1, linewidth=0, label=cls, markeredgecolor="k",
             )
-            for yi in classes
+            for cls in classes if cls in colors
         ]
         legend_kwargs_ = dict(loc="center left", bbox_to_anchor=(1, 0.5), frameon=False)
         if legend_kwargs is not None:
             legend_kwargs_.update(legend_kwargs)
         ax.legend(handles=legend_handles, **legend_kwargs_)
 
-    # ✅ Save to PDF if a path is provided
-    if save_path is not None and fig is not None:  # Ensure fig exists before saving
+    if save_path is not None and fig is not None:
         plt.savefig(save_path, format="pdf", bbox_inches="tight")
         print(f"Plot saved as: {save_path}")
 
     return ax
+
 
 
 def get_colors_for(adata):
