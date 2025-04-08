@@ -73,8 +73,19 @@ def multiplot_transform_umap(adata_path: str, new_path: str):
     ax[1, 0].set_title(f"1000 genes (ARI: {metrics['1000']['ARI']:.4f}, AMI: {metrics['1000']['AMI']:.4f})")
     ax[1, 1].set_title(f"All genes (ARI: {metrics['all']['ARI']:.4f}, AMI: {metrics['all']['AMI']:.4f})")
 
+
+
+    utils.plot(adata_full.obsm["X_umap"], adata.obs["labels"], s=3, colors=colors, draw_legend=False, ax=ax[0, 0], alpha=0.1, title="Initialization", label_order=list(colors.keys()))
+    utils.plot(new_250.obsm["X_umap"], new.obs["labels"], s=12, colors=colors, draw_legend=False, ax=ax[0, 0], alpha=1, title="250 genes", label_order=list(colors.keys()))
+    
+    utils.plot(adata_full.obsm["X_umap"], adata.obs["labels"], s=3, colors=colors, draw_legend=False, ax=ax[0, 1], alpha=0.1, title="250 genes", label_order=list(colors.keys()))
     utils.plot(new_250.obsm["X_umap"], new_250.obs["labels"], s=12, colors=colors, draw_legend=False, ax=ax[0, 1], alpha=1, title="250 genes", label_order=list(colors.keys()))
+    
+    utils.plot(adata_full.obsm["X_umap"], adata.obs["labels"], s=3, colors=colors, draw_legend=False, ax=ax[1, 0], alpha=0.1, title="1000 genes", label_order=list(colors.keys()))
     utils.plot(new_1000.obsm["X_umap"], new_1000.obs["labels"], s=12, colors=colors, draw_legend=False, ax=ax[1, 0], alpha=1, title="1000 genes", label_order=list(colors.keys()))
+    
+     utils.plot(adata_full.obsm["X_umap"], adata.obs["labels"], s=3, colors=colors, draw_legend=True, ax=ax[1, 1], alpha=0.1, title="All genes", label_order=list(colors.keys()),
+            legend_kwargs=dict(bbox_transform=fig.transFigure, loc="lower center", bbox_to_anchor=(0.5, 0.075), ncol=len(np.unique(adata.obs["labels"]))))
     utils.plot(new_full.obsm["X_umap"], new_full.obs["labels"], s=12, colors=colors, draw_legend=True, ax=ax[1, 1], alpha=1, title="All genes", label_order=list(colors.keys()),
                legend_kwargs=dict(bbox_transform=fig.transFigure, loc="lower center", bbox_to_anchor=(0.5, 0.075), ncol=len(np.unique(adata.obs["labels"]))))
 
