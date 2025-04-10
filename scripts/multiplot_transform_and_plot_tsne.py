@@ -13,6 +13,10 @@ def multiplot_transform_tsne(adata_path: str, new_path: str):
     adata = anndata.read_h5ad(adata_path)
     new = anndata.read_h5ad(new_path)
     # adata_3000 = anndata.read_h5ad("../scripts/baron_2016h_embedding_tsne_3000_genes.h5ad")
+    print("Original labels in new (before filtering):", new.obs["labels"].value_counts())
+    print("Original labels in adata (before filtering):", adata.obs["labels"].value_counts())
+    
+
     adata_3000 = anndata.read_h5ad("baron_2016h_embedding_tsne_3000_genes.h5ad")
    
     shared_genes = adata.var_names[adata.var_names.isin(new.var_names)]
