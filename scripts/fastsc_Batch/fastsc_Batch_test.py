@@ -3,6 +3,10 @@ import torch
 import pandas as pd
 import numpy as np
 from tqdm import trange
+import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data_utils.fast_scBatch import solver  # Assuming solver is defined in fast_scBatch.py
 
 
@@ -129,7 +133,7 @@ def run_fastscbatch_pipeline(h5ad_path, corr_path, output_path, solver_fn):
 # run_fastscbatch_pipeline("sample.h5ad", "sample_corr.csv", "output_corrected.h5ad", fast_scBatch.solver)
 if __name__ == "__main__":
     # Example usage of the functions
-    h5ad_path = "sample.h5ad"
+    h5ad_path = "realdata/pancreas/converted_data.h5ad"
     corr_path = "sample_corr.csv"
     output_path = "output_corrected.h5ad"
 
