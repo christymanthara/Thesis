@@ -4,22 +4,30 @@ on:
   push:
     paths:
       - bioinf_table.csv
+      - scripts/update_readme.py
 
 jobs:
   update-readme:
     runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-    - run: pip install pandas tabulate
-    - run: python update_readme.py
-    - name: Commit changes
-      run: |
-        git config user.name "github-actions"
-        git config user.email "github-actions@github.com"
-        git add README.md
-        git commit -m "Update README with latest CSV table" || echo "No changes to commit"
-        git push
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install pandas tabulate
+
+      - name: Run update_readme.py
+        run: python scripts/update_readme.py
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add README.md
+          git commit -m "Auto-update README from CSV" || echo "No changes to commit"
+          git push
