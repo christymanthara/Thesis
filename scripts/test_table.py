@@ -9,6 +9,7 @@ except FileNotFoundError:
 my_table = update_bioinf_table(my_table, 'kidney', 'Pavlin', 0.88)
 my_table = update_bioinf_table(my_table, 'lung', 'source 1', 'Tabula Muris')
 my_table = update_bioinf_table(my_table, 'kidney', 'Pavlin_tsne', 0.95)
+my_table = update_bioinf_table(my_table, 'pancreas', 'baron_', 0.95)
 
 # Step 3: Save updated data
 save_table_as_csv(my_table)
