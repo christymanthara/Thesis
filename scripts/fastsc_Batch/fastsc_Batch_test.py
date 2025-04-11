@@ -10,12 +10,13 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data_utils.fast_scBatch import solver  # Assuming solver is defined in fast_scBatch.py
 
 
-def read_h5ad_data(file_path):
+def read_h5ad_data(file_path, batch_key="Batch"):
     """
     Reads an h5ad file and returns expression matrix, batch labels, and AnnData object.
 
     Parameters:
         file_path (str): Path to the .h5ad file.
+        batch_key (str): Name of the column in obs containing batch information. Default is "Batch".
 
     Returns:
         rawdat (ndarray): Gene expression matrix (cells x genes).
@@ -24,7 +25,7 @@ def read_h5ad_data(file_path):
     """
     adata = anndata.read_h5ad(file_path)
     rawdat = adata.X
-    bat = adata.obs["Batch"].copy().iloc[:, 0] if isinstance(adata.obs["Batch"], pd.DataFrame) else adata.obs["Batch"]
+    bat = adata.obs[batch_key].copy().iloc[:, 0] if isinstance(adata.obs[batch_key], pd.DataFrame) else adata.obs[batch_key]
     return rawdat, bat, adata
 
 
@@ -97,7 +98,7 @@ def save_correlation_matrix(corr, out_path):
     pd.DataFrame(corr.numpy()).to_csv(out_path)
 
 
-def run_fastscbatch_pipeline(h5ad_path, corr_path, output_path, solver_fn):
+def run_fastscbatch_pipeline(h5ad_path, corr_path, output_path, solver_fn, batch_key="Batch", group_key="Group"):
     """
     Runs the full FastSCBatch correction pipeline.
 
@@ -106,10 +107,12 @@ def run_fastscbatch_pipeline(h5ad_path, corr_path, output_path, solver_fn):
         corr_path (str): Path to correlation .csv file.
         output_path (str): Path to save corrected .h5ad file.
         solver_fn (callable): FastSCBatch solver function.
+        batch_key (str): Name of the column in obs containing batch information. Default is "Batch".
+        group_key (str): Name of the column in obs containing group/cell type information. Default is "Group".
     """
     cell = anndata.read_h5ad(h5ad_path)
-    batch = cell.obs[["Batch"]].copy()
-    ctype = cell.obs[["Group"]].copy() if "Group" in cell.obs else None
+    batch = cell.obs[[batch_key]].copy()
+    ctype = cell.obs[[group_key]].copy() if group_key in cell.obs else None
     cells = cell.to_df().T
 
     corr = pd.read_csv(corr_path, index_col=0)
@@ -132,12 +135,13 @@ def run_fastscbatch_pipeline(h5ad_path, corr_path, output_path, solver_fn):
 # save_correlation_matrix(corr, "sample_corr.csv")
 # run_fastscbatch_pipeline("sample.h5ad", "sample_corr.csv", "output_corrected.h5ad", fast_scBatch.solver)
 if __name__ == "__main__":
-    # Example usage of the functions
+    # Example usage of the functions with custom batch column name
     h5ad_path = "realdata/pancreas/converted_data.h5ad"
     corr_path = "sample_corr.csv"
     output_path = "output_corrected.h5ad"
+    batch_column = "batch"  # Use "batch_id" or whatever your column is named
 
-    rawdat, bat, adata = read_h5ad_data(h5ad_path)
+    rawdat, bat, adata = read_h5ad_data(h5ad_path, batch_key=batch_column)
     corr = compute_reference_corr(rawdat, bat)
     save_correlation_matrix(corr, corr_path)
-    run_fastscbatch_pipeline(h5ad_path, corr_path, output_path, solver)  # Assuming solver is defined elsewhere
+    run_fastscbatch_pipeline(h5ad_path, corr_path, output_path, solver, batch_key=batch_column)
