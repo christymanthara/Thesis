@@ -1,6 +1,11 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+from tabulate import tabulate
+
+def display_table(df):
+    print(tabulate(df, headers='keys', tablefmt='fancy_grid', showindex=False))
+
 
 # Initialize the table with specific columns
 def initialize_bioinf_table():
@@ -15,7 +20,7 @@ def update_bioinf_table(df, tissue, column_name, value):
         new_row = {col: None for col in df.columns}
         new_row['tissue'] = tissue
         new_row[column_name] = value
-        df = df.append(new_row, ignore_index=True)
+        df = df._append(new_row, ignore_index=True)
     return df
 
 # Save the DataFrame as CSV
