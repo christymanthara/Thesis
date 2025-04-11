@@ -161,7 +161,13 @@ project/
 ## 🧬 Bioinformatics Table
 
 <!-- TABLE_START -->
-*This table will be auto-generated from `bioinf_table.csv`*
+
+| tissue   | source 1     |   source 2 |   Pavlin |   Pavlin_tsne |   Pavlin_umap |   fastscbatch |   baron_ |
+|----------|--------------|------------|----------|---------------|---------------|---------------|----------|
+| kidney   | nan          |        nan |     0.88 |          0.95 |           nan |           nan |   nan    |
+| lung     | Tabula Muris |        nan |   nan    |        nan    |           nan |           nan |   nan    |
+| pancreas | test         |        nan |   nan    |        nan    |           nan |           nan |     0.95 |
+
 <!-- TABLE_END -->
 
 
