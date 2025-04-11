@@ -45,6 +45,8 @@ def multiplot_transform_umap(adata_path: str, new_path: str):
     reducer_orig = umap.UMAP(n_neighbors=15, min_dist=0.1, metric='cosine', random_state=42)
     embedding_orig = reducer_orig.fit_transform(X_orig)
 
+    
+
     adata_full.obsm["X_umap"] = embedding_orig
     
     # Initialize lists to store gene counts, ARI and AMI values
@@ -53,13 +55,13 @@ def multiplot_transform_umap(adata_path: str, new_path: str):
     ari_values = []   # To store ARI values
     ami_values = []   # To store AMI values
     
-    for new_, genes in [(new_250, 250), (new_1000, 1000), (new_full, new_full.shape[1])]:
+    for new_, genes in [(new_full, new_full.shape[1])]:
         print(f"Running UMAP for {genes} genes")
         
         X = new_.X.toarray() if sp.issparse(new_.X) else new_.X
 
         reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, metric='cosine', random_state=42)
-        embedding = reducer.fit_transform(X)
+        embedding = reducer_orig.transform(X)
 
         new_.obsm["X_umap"] = embedding
         print(f"the values are {adata.obs['labels']}")
@@ -108,8 +110,8 @@ def multiplot_transform_umap(adata_path: str, new_path: str):
 
     fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(16, 16))
 
-    ax[0, 1].set_title(f"250 genes (ARI: {metrics['250']['ARI']:.4f}, AMI: {metrics['250']['AMI']:.4f})")
-    ax[1, 0].set_title(f"1000 genes (ARI: {metrics['1000']['ARI']:.4f}, AMI: {metrics['1000']['AMI']:.4f})")
+    # ax[0, 1].set_title(f"250 genes (ARI: {metrics['250']['ARI']:.4f}, AMI: {metrics['250']['AMI']:.4f})")
+    # ax[1, 0].set_title(f"1000 genes (ARI: {metrics['1000']['ARI']:.4f}, AMI: {metrics['1000']['AMI']:.4f})")
     ax[1, 1].set_title(f"All genes ({new_full.shape[1]}) (ARI: {metrics[str(new_full.shape[1])]['ARI']:.4f}, AMI: {metrics[str(new_full.shape[1])]['AMI']:.4f})")
 
     utils.plot(adata_full.obsm["X_umap"], adata.obs["labels"], s=3, colors=colors,classes=classes, draw_legend=False, ax=ax[0, 0], alpha=0.1, title="Initialization", label_order=list(colors.keys()))
