@@ -1,4 +1,2 @@
-tissue,source 1,source 2,Pavlin,Pavlin_tsne,Pavlin_umap,fastscbatch,baron_
-kidney,,,0.88,0.95,,,
-lung,Tabula Muris,,,,,,
-pancreas,test2,,,,,,0.95
+tissue,source 1,source 2,Pavlin,Pavlin_tsne,Pavlin_umap,fastscbatch
+kidney,,,"0.88",kidney_tsne.png,kidney_umap.png,
