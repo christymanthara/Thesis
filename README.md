@@ -166,7 +166,7 @@ project/
 |----------|--------------|------------|----------|---------------|---------------|---------------|----------|
 | kidney   | nan          |        nan |     0.88 |          0.95 |           nan |           nan |   nan    |
 | lung     | Tabula Muris |        nan |   nan    |        nan    |           nan |           nan |   nan    |
-| pancreas | test         |        nan |   nan    |        nan    |           nan |           nan |     0.95 |
+| pancreas | test2        |        nan |   nan    |        nan    |           nan |           nan |     0.95 |
 
 <!-- TABLE_END -->
 
