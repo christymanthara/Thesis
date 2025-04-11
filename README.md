@@ -162,11 +162,9 @@ project/
 
 <!-- TABLE_START -->
 
-| tissue   | source 1     |   source 2 |   Pavlin |   Pavlin_tsne |   Pavlin_umap |   fastscbatch |   baron_ |
-|----------|--------------|------------|----------|---------------|---------------|---------------|----------|
-| kidney   | nan          |        nan |     0.88 |          0.95 |           nan |           nan |   nan    |
-| lung     | Tabula Muris |        nan |   nan    |        nan    |           nan |           nan |   nan    |
-| pancreas | test2        |        nan |   nan    |        nan    |           nan |           nan |     0.95 |
+| tissue   |   source 1 |   source 2 |   Pavlin | Pavlin_tsne                                  | Pavlin_umap                                  |   fastscbatch |
+|----------|------------|------------|----------|----------------------------------------------|----------------------------------------------|---------------|
+| kidney   |        nan |        nan |     0.88 | [kidney_tsne.png](./visuals/kidney_tsne.png) | [kidney_umap.png](./visuals/kidney_umap.png) |           nan |
 
 <!-- TABLE_END -->
 
