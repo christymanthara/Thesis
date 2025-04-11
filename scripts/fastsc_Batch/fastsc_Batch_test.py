@@ -5,6 +5,9 @@ import numpy as np
 from tqdm import trange
 import os
 import sys
+import scipy.sparse
+
+
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data_utils.fast_scBatch import solver  # Assuming solver is defined in fast_scBatch.py
@@ -13,18 +16,16 @@ from data_utils.fast_scBatch import solver  # Assuming solver is defined in fast
 def read_h5ad_data(file_path, batch_key="Batch"):
     """
     Reads an h5ad file and returns expression matrix, batch labels, and AnnData object.
-
-    Parameters:
-        file_path (str): Path to the .h5ad file.
-        batch_key (str): Name of the column in obs containing batch information. Default is "Batch".
-
-    Returns:
-        rawdat (ndarray): Gene expression matrix (cells x genes).
-        bat (Series): Batch labels.
-        adata (AnnData): Full AnnData object.
+    Converts sparse matrix to dense if needed.
     """
     adata = anndata.read_h5ad(file_path)
-    rawdat = adata.X
+    
+    # Convert sparse matrix to dense array if needed
+    if scipy.sparse.issparse(adata.X):
+        rawdat = adata.X.toarray()
+    else:
+        rawdat = adata.X
+    
     bat = adata.obs[batch_key].copy().iloc[:, 0] if isinstance(adata.obs[batch_key], pd.DataFrame) else adata.obs[batch_key]
     return rawdat, bat, adata
 
