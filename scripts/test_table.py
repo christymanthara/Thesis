@@ -12,6 +12,7 @@ my_table = update_bioinf_table(my_table, 'kidney', 'Pavlin_tsne', 0.95)
 my_table = update_bioinf_table(my_table, 'pancreas', 'baron_', 0.95)
 my_table = update_bioinf_table(my_table, 'pancreas', 'source 1', 'Xen')
 my_table = update_bioinf_table(my_table, 'pancreas', 'source 1', 'test')
+my_table = update_bioinf_table(my_table, 'pancreas', 'source 1', 'test2')
 
 # Step 3: Save updated data
 save_table_as_csv(my_table)

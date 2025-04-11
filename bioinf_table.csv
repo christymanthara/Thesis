@@ -1,4 +1,4 @@
 tissue,source 1,source 2,Pavlin,Pavlin_tsne,Pavlin_umap,fastscbatch,baron_
 kidney,,,0.88,0.95,,,
 lung,Tabula Muris,,,,,,
-pancreas,test,,,,,,0.95
+pancreas,test2,,,,,,0.95
