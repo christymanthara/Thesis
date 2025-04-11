@@ -158,6 +158,13 @@ project/
     └── xin_2016.h5ad
 ```
 
+## 🧬 Bioinformatics Table
+
+<!-- TABLE_START -->
+*This table will be auto-generated from `bioinf_table.csv`*
+<!-- TABLE_END -->
+
+
 ## Notes
 
 - The scripts use a custom `utils.py` module that needs to be available in the same directory.
