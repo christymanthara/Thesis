@@ -9,7 +9,7 @@ from data_utils.processing import load_and_preprocess_single
 
 # If you're updating the functions directly, import them as usual:
 from data_utils.clustering_metrics_KL_JS import compute_kl_divergence, compute_js_divergence
-from data_utils.create_table import initialize_bioinf_table, add_row_to_table, display_table,save_table_as_csv
+from data_utils.create_table import initialize_bioinf_table, display_table,save_table_as_csv
 
 
 
@@ -23,6 +23,17 @@ def main():
 
     adata1 = "Datasets/baron_2016h.h5ad"
     adata2 = "Datasets/xin_2016.h5ad"
+
+    
+
+    filename1 = os.path.basename(adata1)
+    filename2 = os.path.basename(adata2)
+
+    print(f"extracted filename is {filename1}")  # baron_2016h.h5ad
+    print(f"extracted filename is {filename2}")  # xin_2016.h5ad
+
+
+
     print(f"Loading and preprocessing {adata1}")
     adata1_embedded = load_and_preprocess_single(adata1, use_basename=True)
     
@@ -63,38 +74,7 @@ def main():
         print(f"KL Divergence ({embedding_key}): {kl:.4f}")
         print(f"JS Divergence ({embedding_key}): {js:.4f}")
 
-    # Add rows for different tissue comparisons with KL and JS values
-    bioinf_table = add_row_to_table(
-        bioinf_table,
-        tissue="Pancreas",
-        source_1="Baron",
-        source_2="Xin",
-        kl_value=3.9180,
-        js_value=0.5406,
-        kl_bandwidth=0.5,
-        js_bandwidth=0.5,
-        ARI=0.85,
-        AMI=0.78
-    )
-
-    bioinf_table = add_row_to_table(
-        bioinf_table,
-        tissue="Pancreas", 
-        source_1="Human",
-        source_2="Human",
-        kl_value=4.1533,
-        js_value=0.6177,
-        Pavlin=0.92
-    )
-
-    bioinf_table = add_row_to_table(
-        bioinf_table,
-        tissue="Mixed",
-        source_1="Human",
-        source_2="Mouse",
-        kl_value=4.6233,
-        js_value=0.6293
-    )
+ 
 
     # Display the table
     display_table(bioinf_table)
