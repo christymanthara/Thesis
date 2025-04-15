@@ -162,9 +162,8 @@ project/
 
 <!-- TABLE_START -->
 
-| tissue   |   source 1 |   source 2 |   Pavlin | Pavlin_tsne                                                                                  | Pavlin_umap   |   fastscbatch |
-|----------|------------|------------|----------|----------------------------------------------------------------------------------------------|---------------|---------------|
-| kidney   |        nan |        nan |     0.88 | [baron_2016h-xin_2016-plotontop_tsne.pdf](./visuals/baron_2016h-xin_2016-plotontop_tsne.pdf) |               |           nan |
+| tissue   | source 1   | source 2   | Pavlin   | Pavlin_tsne   | Pavlin_umap   | fastscbatch   | ARI   | AMI   | KL-source   | JS-source   |
+|----------|------------|------------|----------|---------------|---------------|---------------|-------|-------|-------------|-------------|
 
 <!-- TABLE_END -->
 
