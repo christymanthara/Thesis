@@ -9,7 +9,7 @@ def display_table(df):
 
 # Initialize the table with specific columns
 def initialize_bioinf_table():
-    columns = ['tissue', 'source 1', 'source 2', 'Pavlin', 'Pavlin_tsne', 'Pavlin_umap', 'fastscbatch']
+    columns = ['tissue', 'source 1', 'source 2', 'Pavlin', 'Pavlin_tsne', 'Pavlin_umap', 'fastscbatch', 'ARI', 'AMI', 'KL', 'JS']
     return pd.DataFrame(columns=columns)
 
 # Add or update a specific cell in the table

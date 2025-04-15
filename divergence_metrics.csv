@@ -1,0 +1,4 @@
+tissue,source_1,source_2,Pavlin,Pavlin_tsne,Pavlin_umap,fastscbatch,ARI,AMI,KL_value,KL_bandwidth,JS_value,JS_bandwidth
+Pancreas,Baron,Xin,,,,,0.85,0.78,3.918,0.5,0.5406,0.5
+Pancreas,Human,Human,0.92,,,,,,4.1533,0.5,0.6177,0.5
+Mixed,Human,Mouse,,,,,,,4.6233,0.5,0.6293,0.5
