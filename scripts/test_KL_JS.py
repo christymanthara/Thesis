@@ -19,7 +19,7 @@ def main():
     # adata1 = "extracted_csv/GSM2230757_human1_umifm_counts_human.h5ad"
     # adata2 = "extracted_csv\GSM2230758_human2_umifm_counts_human.h5ad"
 
-    bioinf_table = initialize_bioinf_table()
+    # bioinf_table = initialize_bioinf_table()
 
     adata1 = "Datasets/baron_2016h.h5ad"
     adata2 = "Datasets/xin_2016.h5ad"
@@ -76,11 +76,11 @@ def main():
 
  
 
-    # Display the table
-    display_table(bioinf_table)
+    # # Display the table
+    # display_table(bioinf_table)
 
-    # Save the table
-    save_table_as_csv(bioinf_table, "bioinf_table.csv")
+    # # Save the table
+    # save_table_as_csv(bioinf_table, "bioinf_table.csv")
 
 if __name__ == "__main__":
     main()
