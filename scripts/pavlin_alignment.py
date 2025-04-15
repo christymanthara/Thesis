@@ -1,7 +1,5 @@
 import openTSNE
 import scanpy as sc
-from sklearn import decomposition
-import matplotlib.pyplot as plt
 from data_utils.processing import load_and_preprocess
 import utils  # assuming utils.plot is available for plotting
 import os
@@ -54,4 +52,6 @@ def tsne_pavlin(file1, file2, output_pdf=None):
 
 if __name__ == "__main__":
     # tsne_pavlin("../datasets/baron_2016h.h5ad", "../datasets/xin_2016.h5ad")
-    tsne_pavlin("../extracted_csv/GSM2230757_human1_umifm_counts_human.h5ad", "../extracted_csv/GSM2230758_human2_umifm_counts_human.h5ad")
+    # tsne_pavlin("../extracted_csv/GSM2230757_human1_umifm_counts_human.h5ad", "../extracted_csv/GSM2230758_human2_umifm_counts_human.h5ad")
+    tsne_pavlin("Datasets/baron_2016h.h5ad", "Datasets/xin_2016.h5ad")
+   
