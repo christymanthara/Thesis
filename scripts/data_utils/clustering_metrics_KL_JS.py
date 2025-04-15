@@ -11,6 +11,7 @@ def compute_kl_divergence(
     cluster_key='cell_type',  # Used if mode == 'cluster'
     bins=50,
     sample_size=100,
+    bandwidth=0.1,            # Added bandwidth parameter for KDE
     epsilon=1e-10
 ):
     if mode == 'gene':
@@ -29,24 +30,37 @@ def compute_kl_divergence(
         Q = np.maximum(hist2, epsilon)
 
     elif mode == 'embedding':
-        # emb1 = adata1.obsm[embedding_key]
-        # emb2 = adata2.obsm[embedding_key]
-
         emb1 = adata1.obsm[embedding_key]
         emb2 = adata2.obsm[embedding_key]
-
-        # Use a sample for density comparison
-        sample_points = emb1[:sample_size]
-
-        kde1 = KernelDensity(kernel='gaussian').fit(emb1)
-        kde2 = KernelDensity(kernel='gaussian').fit(emb2)
-
+        
+        # Use samples from both datasets for evaluation
+        if sample_size > emb1.shape[0]:
+            sample_size = emb1.shape[0]
+        if sample_size > emb2.shape[0]:
+            sample_size = emb2.shape[0]
+            
+        # Sample points to evaluate density at
+        np.random.seed(42)  # For reproducibility
+        idx1 = np.random.choice(emb1.shape[0], size=sample_size//2, replace=False)
+        idx2 = np.random.choice(emb2.shape[0], size=sample_size//2, replace=False)
+        
+        sample_points1 = emb1[idx1]
+        sample_points2 = emb2[idx2]
+        sample_points = np.vstack([sample_points1, sample_points2])
+        
+        # Fit KDEs with specified bandwidth
+        kde1 = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(emb1)
+        kde2 = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(emb2)
+        
+        # Get log densities
         log_p1 = kde1.score_samples(sample_points)
         log_p2 = kde2.score_samples(sample_points)
-
+        
+        # Convert to probabilities
         P = np.exp(log_p1)
         Q = np.exp(log_p2)
-
+        
+        # Ensure no zeros
         P = np.maximum(P, epsilon)
         Q = np.maximum(Q, epsilon)
 
@@ -71,11 +85,6 @@ def compute_kl_divergence(
 
     return kl_div
 
-
-# import numpy as np
-# from scipy.special import rel_entr
-# from sklearn.neighbors import KernelDensity
-
 def compute_js_divergence(
     adata1, 
     adata2, 
@@ -85,6 +94,7 @@ def compute_js_divergence(
     cluster_key='cell_type',  # Used if mode == 'cluster'
     bins=50,
     sample_size=100,
+    bandwidth=0.1,            # Added bandwidth parameter for KDE
     epsilon=1e-10
 ):
     if mode == 'gene':
@@ -104,18 +114,35 @@ def compute_js_divergence(
     elif mode == 'embedding':
         emb1 = adata1.obsm[embedding_key]
         emb2 = adata2.obsm[embedding_key]
-
-        sample_points = emb1[:sample_size]
-
-        kde1 = KernelDensity(kernel='gaussian').fit(emb1)
-        kde2 = KernelDensity(kernel='gaussian').fit(emb2)
-
+        
+        # Use samples from both datasets for evaluation
+        if sample_size > emb1.shape[0]:
+            sample_size = emb1.shape[0]
+        if sample_size > emb2.shape[0]:
+            sample_size = emb2.shape[0]
+            
+        # Sample points to evaluate density at
+        np.random.seed(42)  # For reproducibility
+        idx1 = np.random.choice(emb1.shape[0], size=sample_size//2, replace=False)
+        idx2 = np.random.choice(emb2.shape[0], size=sample_size//2, replace=False)
+        
+        sample_points1 = emb1[idx1]
+        sample_points2 = emb2[idx2]
+        sample_points = np.vstack([sample_points1, sample_points2])
+        
+        # Fit KDEs with specified bandwidth
+        kde1 = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(emb1)
+        kde2 = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(emb2)
+        
+        # Get log densities
         log_p1 = kde1.score_samples(sample_points)
         log_p2 = kde2.score_samples(sample_points)
-
+        
+        # Convert to probabilities
         P = np.exp(log_p1)
         Q = np.exp(log_p2)
-
+        
+        # Ensure no zeros
         P = np.maximum(P, epsilon)
         Q = np.maximum(Q, epsilon)
 
@@ -142,16 +169,3 @@ def compute_js_divergence(
     js_div = 0.5 * np.sum(rel_entr(P, M)) + 0.5 * np.sum(rel_entr(Q, M))
 
     return js_div
-
-
-# # JS Divergence for gene
-# js_gene = compute_js_divergence(adata1, adata2, mode='gene', gene='Actb')
-# print(f"JS Divergence (gene): {js_gene:.4f}")
-
-# # JS Divergence for embedding
-# js_emb = compute_js_divergence(adata1, adata2, mode='embedding', embedding_key='X_pca')
-# print(f"JS Divergence (embedding): {js_emb:.4f}")
-
-# # JS Divergence for cluster proportions
-# js_clust = compute_js_divergence(adata1, adata2, mode='cluster', cluster_key='cell_type')
-# print(f"JS Divergence (cluster): {js_clust:.4f}")
