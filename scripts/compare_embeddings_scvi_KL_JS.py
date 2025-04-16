@@ -98,38 +98,10 @@ def tsne_side_by_side_with_metrics(file1, file2, output_pdf=None):
         output_pdf = f"tsne_plot_scVI_KL_JS_concatenated{file1_name}_{file2_name}.pdf"
     
     # Plot using the provided utils.plot function and save the plot
-    utils.plot(embedding, adata_full.obs["source"], save_path=output_pdf)
+    utils.plot(embedding, adata_full.obs["source"], save_path=output_pdf,kl_divergence=kl,
+    js_divergence=js,save_as_svg=True)
 
 
-    # === Plot side by side with metrics ===
-    # fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    
-    # fig, ax = plt.subplots(figsize=(8, 6))
-
-    # # ax.scatter(tsne1[:, 0], tsne1[:, 1], s=3, c="tab:blue", alpha=0.6, label=os.path.basename(file1))
-    # # ax.scatter(tsne2[:, 0], tsne2[:, 1], s=3, c="tab:green", alpha=0.6, label=os.path.basename(file2))
-
-    # # ax.set_title("t-SNE: Overlay of Both Datasets with scVI embeddings", fontsize=12)
-    # # ax.axis("off")
-    # # ax.legend(fontsize=8)
-
-    # # Add divergence metrics text below the plots
-    # fig.text(0.5, 0.02, f"KL Divergence = {kl:.4f}    |    JS Divergence = {js:.4f}", 
-    #          ha='center', fontsize=12)
-
-    # plt.tight_layout(rect=[0, 0.05, 1, 1])
-
-    # if output_pdf is None:
-    #     file1_name = os.path.splitext(os.path.basename(file1))[0]
-    #     file2_name = os.path.splitext(os.path.basename(file2))[0]
-    #     output_pdf = f"scvi_with_metrics_overlay_pavlin_concat{file1_name}_{file2_name}.pdf"
-
-    # print(f"Saving plot to {output_pdf}")
-    # plt.savefig(output_pdf)
-
-    # svg_output = output_pdf.replace(".pdf", ".svg")
-    # plt.savefig(svg_output, format="svg", dpi=300)
-    # plt.close()
 
 
 if __name__ == "__main__":
