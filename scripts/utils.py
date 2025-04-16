@@ -196,6 +196,10 @@ def plot(
     label_order=None,
     classes=None,  # ✅ New
     save_path=None,
+    kl_divergence=None,         # ✅ New
+    js_divergence=None,         # ✅ New
+    save_as_svg=False,
+
     **kwargs
 ):
     import matplotlib.pyplot as plt
@@ -273,9 +277,24 @@ def plot(
             legend_kwargs_.update(legend_kwargs)
         ax.legend(handles=legend_handles, **legend_kwargs_)
 
+
+        # ✅ Add divergence metrics
+    if kl_divergence is not None and js_divergence is not None:
+        add_divergence_text(fig, kl_divergence, js_divergence, fontsize=kwargs.get("fontsize", 12))
+
     if save_path is not None and fig is not None:
-        plt.savefig(save_path, format="pdf", bbox_inches="tight")
-        print(f"Plot saved as: {save_path}")
+        # Always save as PDF
+        pdf_path = save_path if save_path.endswith(".pdf") else save_path + ".pdf"
+        plt.savefig(pdf_path, format="pdf", bbox_inches="tight")
+        print(f"Plot saved as: {pdf_path}")
+
+        # Optionally save as SVG
+        if save_as_svg:
+            svg_path = save_path.replace(".pdf", ".svg") if save_path.endswith(".pdf") else save_path + ".svg"
+            plt.savefig(svg_path, format="svg", bbox_inches="tight")
+            print(f"Also saved as: {svg_path}")
+    
+
 
     return ax
 
@@ -296,3 +315,10 @@ def get_colors_for(adata):
     assert all(l in colors for l in adata.obs["labels"].unique())
 
     return colors
+
+
+def add_divergence_text(fig, kl, js, fontsize=12):
+    """Adds KL and JS divergence values as a caption to the figure."""
+    if fig is not None:
+        fig.text(0.5, 0.02, f"KL Divergence = {kl:.4f}    |    JS Divergence = {js:.4f}", 
+                 ha='center', fontsize=fontsize)
