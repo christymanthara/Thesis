@@ -9,11 +9,11 @@ This report analyzes the Kullback-Leibler (KL) and Jensen-Shannon (JS) divergenc
 
 ### 🔹 t-SNE Plot: Baron vs Xin
 
-![t-SNE Baron vs Xin](./Pavlins_tsne_with_metrics_genefiltered_baron_2016h_xin_2016.svg)
+![t-SNE Baron vs Xin](./figures/Pavlins_tsne_with_metrics_genefiltered_baron_2016h_xin_2016.svg)
 
 ### 🔹 t-SNE Plot: Human1 vs Human2
 
-![t-SNE Human vs Human](./Pavlins_tsne_with_metrics_genefiltered_GSM2230757_human1_umifm_counts_human_GSM2230758_human2_umifm_counts_human.svg)
+![t-SNE Human vs Human](./figures/Pavlins_tsne_with_metrics_genefiltered_GSM2230757_human1_umifm_counts_human_GSM2230758_human2_umifm_counts_human.svg)
 
 ## Results Summary
 

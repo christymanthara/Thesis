@@ -31,11 +31,11 @@ These datasets are all derived from **pancreatic tissue**, but represent either 
 
 ### 🔹 t-SNE Plot: Baron vs Xin
 
-![t-SNE Baron vs Xin](./tsne_plot_scVI_KL_JS_concatenatedbaron_2016h_xin_2016.svg)
+![t-SNE Baron vs Xin](./figures/tsne_plot_scVI_KL_JS_concatenatedbaron_2016h_xin_2016.svg)
 
 ### 🔹 t-SNE Plot: Human1 vs Human2
 
-![t-SNE Human vs Human](./tsne_plot_scVI_KL_JS_concatenatedGSM2230757_human1_umifm_counts_human_GSM2230758_human2_umifm_counts_human.svg)
+![t-SNE Human vs Human](./figures/tsne_plot_scVI_KL_JS_concatenatedGSM2230757_human1_umifm_counts_human_GSM2230758_human2_umifm_counts_human.svg)
 
 ---
 
