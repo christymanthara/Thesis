@@ -14,3 +14,6 @@ scripts/*.ipynb
 *.pdf
 
 UCE
+
+*.svg
+!reports/*.svg
