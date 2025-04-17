@@ -57,6 +57,6 @@ def print_adata_stats(file_path):
 
 if __name__ == "__main__":
     # Example usage
-    print_adata_stats("../extracted_csv/GSM2230757_human1_umifm_counts_human.h5ad")
-    print_adata_stats("../extracted_csv/GSM2230758_human2_umifm_counts_human.h5ad")
-    print_adata_stats("../datasets/baron_2016h.h5ad")
+    print_adata_stats("extracted_csv/GSM2230757_human1_umifm_counts_human.h5ad")
+    print_adata_stats("extracted_csv/GSM2230758_human2_umifm_counts_human.h5ad")
+    # print_adata_stats("../datasets/baron_2016h.h5ad")
