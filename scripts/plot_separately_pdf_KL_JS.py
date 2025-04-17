@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from data_utils.processing import load_and_preprocess_single,load_and_preprocess_separately
 from data_utils.clustering_metrics_KL_JS import compute_kl_divergence, compute_js_divergence
 import os
+import utils
 
 
 def tsne_side_by_side_with_metrics(file1, file2, output_pdf=None):
@@ -56,39 +57,52 @@ def tsne_side_by_side_with_metrics(file1, file2, output_pdf=None):
         tsne.optimize(n_iter=750, exaggeration=1, momentum=0.8, inplace=True)
         return tsne
 
-    tsne1 = run_tsne(X1)
-    tsne2 = run_tsne(X2)
+    # tsne1 = run_tsne(X1)
+    # tsne2 = run_tsne(X2)
 
-    # === Plot side by side with metrics ===
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    adata_full = adata1.concatenate(adata2)
+    X = adata_full.obsm["X_pca"]
+
+   #-------------------------------------------pavlins plotting
+     # Compute affinities using multiscale perplexities
+    affinities = openTSNE.affinity.Multiscale(
+        adata_full.obsm["X_pca"],
+        perplexities=[50, 500],
+        metric="cosine",
+        n_jobs=8,
+        random_state=0,
+    )
+    # Initialize embedding using PCA
+    init = openTSNE.initialization.pca(adata_full.obsm["X_pca"], random_state=0)
+    embedding = openTSNE.TSNEEmbedding(
+        init,
+        affinities,
+        negative_gradient_method="fft",
+        n_jobs=8,
+    )
     
-    axes[0].scatter(tsne1[:, 0], tsne1[:, 1], s=3, c="tab:blue", alpha=0.6)
-    axes[0].set_title(f"{os.path.basename(file1)}\n(t-SNE)", fontsize=10)
-    axes[0].axis("off")
-
-    axes[1].scatter(tsne2[:, 0], tsne2[:, 1], s=3, c="tab:green", alpha=0.6)
-    axes[1].set_title(f"{os.path.basename(file2)}\n(t-SNE)", fontsize=10)
-    axes[1].axis("off")
-
-    # Add divergence metrics text below the plots
-    fig.text(0.5, 0.02, f"KL Divergence = {kl:.4f}    |    JS Divergence = {js:.4f}", 
-             ha='center', fontsize=12)
-
-    plt.tight_layout(rect=[0, 0.05, 1, 1])
-
+    # Optimize the embedding in two phases
+    embedding.optimize(n_iter=250, exaggeration=12, momentum=0.5, inplace=True)
+    embedding.optimize(n_iter=750, exaggeration=1, momentum=0.8, inplace=True)
+    
+    # Generate default output_pdf name if not provided
     if output_pdf is None:
+        # Extract file names without extensions
         file1_name = os.path.splitext(os.path.basename(file1))[0]
         file2_name = os.path.splitext(os.path.basename(file2))[0]
-        output_pdf = f"tsne_with_metrics_genefiltered_{file1_name}_{file2_name}.pdf"
+        # Create the output file name
+        output_pdf = f"Pavlins_tsne_with_metrics_genefiltered_{file1_name}_{file2_name}.pdf"
+    
+    # Plot using the provided utils.plot function and save the plot
+    utils.plot(embedding, adata_full.obs["source"], save_path=output_pdf,kl_divergence=kl,
+    js_divergence=js,save_as_svg=True)
 
-    print(f"Saving plot to {output_pdf}")
-    plt.savefig(output_pdf)
-    plt.close()
+
 
 
 if __name__ == "__main__":
-    # tsne_side_by_side_with_metrics(
-    #     "extracted_csv/GSM2230757_human1_umifm_counts_human.h5ad",
-    #     "extracted_csv/GSM2230758_human2_umifm_counts_human.h5ad"
-    # )
-    tsne_side_by_side_with_metrics("Datasets/baron_2016h.h5ad", "Datasets/xin_2016.h5ad")
+    tsne_side_by_side_with_metrics(
+        "extracted_csv/GSM2230757_human1_umifm_counts_human.h5ad",
+        "extracted_csv/GSM2230758_human2_umifm_counts_human.h5ad"
+    )
+    # tsne_side_by_side_with_metrics("Datasets/baron_2016h.h5ad", "Datasets/xin_2016.h5ad")
