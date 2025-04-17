@@ -4,6 +4,8 @@ import scvi
 import numpy as np
 import pandas as pd
 import os
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 def load_and_preprocess_for_scvi(file1, file2, label_column="labels", use_basename=True,
                                   batch_key="source", n_top_genes=2000, n_latent=30):
@@ -54,6 +56,13 @@ def load_and_preprocess_for_scvi(file1, file2, label_column="labels", use_basena
 
     # Store latent embeddings
     full.obsm["X_scVI"] = model.get_latent_representation()
+
+    #Testing the integration
+    sc.pp.neighbors(full, use_rep="X_scVI")
+    sc.tl.umap(full)
+    sc.pl.umap(full, color=batch_key)
+    sc.pl.umap(full, color=label_column) #testing via the label_column by coloring base on the label_column
+
 
     # Split back the datasets
     adata1_out = full[full.obs[batch_key] == label1].copy()
