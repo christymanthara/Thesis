@@ -105,8 +105,8 @@ def tsne_side_by_side_with_metrics(file1, file2, output_pdf=None):
 
 
 if __name__ == "__main__":
-    tsne_side_by_side_with_metrics(
-        "extracted_csv/GSM2230757_human1_umifm_counts_human.h5ad",
-        "extracted_csv/GSM2230758_human2_umifm_counts_human.h5ad"
-    )
-    # tsne_side_by_side_with_metrics("Datasets/baron_2016h.h5ad", "Datasets/xin_2016.h5ad")
+    # tsne_side_by_side_with_metrics(
+    #     "extracted_csv/GSM2230757_human1_umifm_counts_human.h5ad",
+    #     "extracted_csv/GSM2230758_human2_umifm_counts_human.h5ad"
+    # )
+    tsne_side_by_side_with_metrics("Datasets/baron_2016h.h5ad", "Datasets/xin_2016.h5ad")
