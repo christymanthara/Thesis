@@ -17,3 +17,4 @@ UCE
 
 *.svg
 !reports/*.svg
+scripts/cuda_test.py
