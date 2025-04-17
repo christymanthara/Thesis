@@ -158,7 +158,7 @@ project/
     └── xin_2016.h5ad
 ```
 
-## 🧬 Bioinformatics Table
+## 🧬 Batcheffects comparison Table
 
 <!-- TABLE_START -->
 
