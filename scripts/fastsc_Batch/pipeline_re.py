@@ -201,52 +201,294 @@ def optimized_quantile_normalize_correlation(D, batch_tensor):
     return 0.5 * (D_normalized + D_normalized.T)
 
 
-def plot_corr_heatmap(D, title="Correlation Matrix", figsize=(6,5)):
-    plt.figure(figsize=figsize)
-    sns.heatmap(D.cpu().numpy(), cmap='coolwarm', xticklabels=False, yticklabels=False)
-    plt.title(title)
+@torch.compile
+def memory_efficient_quantile_normalize(D, batch_tensor, chunk_size=1000):
+    """
+    Memory-efficient implementation of quantile normalization
+    - Processes correlation matrix in chunks
+    - Uses float32 instead of float64
+    - Avoids large temporary arrays
+    """
+    device = D.device
+    n = D.shape[0]
+    D = D.to(torch.float32)  # Convert to float32 to save memory
+    unique_batches = torch.unique(batch_tensor)
+    
+    # Create batch indices dictionary
+    batch_to_indices = {
+        b.item(): (batch_tensor == b).nonzero(as_tuple=True)[0] for b in unique_batches
+    }
+    
+    # Select reference batch (largest batch)
+    ref_batch = max(batch_to_indices, key=lambda b: len(batch_to_indices[b]))
+    ref_idx = batch_to_indices[ref_batch]
+    
+    # Create reference distribution in chunks
+    print("Creating reference distribution...")
+    ref_values = []
+    for i in range(0, len(ref_idx), chunk_size):
+        end_i = min(i + chunk_size, len(ref_idx))
+        for j in range(0, len(ref_idx), chunk_size):
+            end_j = min(j + chunk_size, len(ref_idx))
+            chunk = D[ref_idx[i:end_i]][:, ref_idx[j:end_j]].flatten()
+            ref_values.append(chunk)
+    
+    ref_values = torch.cat(ref_values)
+    ref_sorted = torch.sort(ref_values)[0]
+    del ref_values  # Free memory
+    
+    # Process matrix in small chunks
+    print("Processing matrix in chunks...")
+    for b1_idx, b1 in enumerate(unique_batches):
+        b1 = b1.item()
+        indices1 = batch_to_indices[b1]
+        
+        for b2_idx, b2 in enumerate(unique_batches):
+            if b2_idx < b1_idx:  # Skip lower triangular part (will mirror later)
+                continue
+                
+            b2 = b2.item()
+            indices2 = batch_to_indices[b2]
+            print(f"Processing batch {b1} vs {b2}")
+            
+            # Process this batch pair in small chunks
+            for i in range(0, len(indices1), chunk_size):
+                end_i = min(i + chunk_size, len(indices1))
+                for j in range(0, len(indices2), chunk_size):
+                    end_j = min(j + chunk_size, len(indices2))
+                    
+                    # Get chunk indices
+                    i_indices = indices1[i:end_i]
+                    j_indices = indices2[j:end_j]
+                    
+                    # Process chunk
+                    chunk = D[i_indices][:, j_indices].clone()
+                    flat_chunk = chunk.flatten()
+                    
+                    # Normalize chunk
+                    sort_indices = torch.argsort(flat_chunk)
+                    interp_indices = torch.linspace(0, len(ref_sorted)-1, len(flat_chunk), device=device).long()
+                    normalized_values = ref_sorted[interp_indices]
+                    
+                    # Place values back according to original order
+                    result_chunk = torch.empty_like(flat_chunk)
+                    result_chunk[sort_indices] = normalized_values
+                    D[i_indices][:, j_indices] = result_chunk.reshape(len(i_indices), len(j_indices))
+                    
+                    # Set symmetric part if this is not a diagonal block
+                    if b1 != b2:
+                        D[j_indices][:, i_indices] = result_chunk.reshape(len(i_indices), len(j_indices)).T
+    
+    # Final symmetrize step
+    print("Symmetrizing matrix...")
+    # Process symmetrization in chunks to avoid large temporary arrays
+    for i in range(0, n, chunk_size):
+        end_i = min(i + chunk_size, n)
+        for j in range(i, n, chunk_size):  # Start from i to only process upper triangle
+            end_j = min(j + chunk_size, n)
+            if i == j:
+                # Diagonal block - already symmetric
+                continue
+            else:
+                # Average the upper and lower triangular parts
+                upper = D[i:end_i, j:end_j]
+                lower = D[j:end_j, i:end_i].T
+                avg = 0.5 * (upper + lower)
+                D[i:end_i, j:end_j] = avg
+                D[j:end_j, i:end_i] = avg.T
+    
+    return D
+
+
+# def plot_corr_heatmap(D, title="Correlation Matrix", figsize=(6,5)):
+#     plt.figure(figsize=figsize)
+#     sns.heatmap(D.cpu().numpy(), cmap='coolwarm', xticklabels=False, yticklabels=False)
+#     plt.title(title)
+#     plt.tight_layout()
+#     plt.show()
+
+def plot_corr_heatmap(D, title="Correlation Matrix", figsize=(6,5), max_size=1000):
+    """
+    Memory-efficient heatmap plotting that downsamples large matrices
+    
+    Parameters:
+    - D: correlation matrix tensor
+    - title: plot title
+    - figsize: figure size
+    - max_size: maximum size for visualization (will downsample if larger)
+    """
+    # Convert to CPU and numpy
+    D_np = D.cpu().numpy()
+    
+    # Check if downsampling is needed
+    n = D_np.shape[0]
+    if n > max_size:
+        print(f"Matrix too large ({n}x{n}), downsampling to {max_size}x{max_size} for visualization")
+        # Calculate stride for downsampling
+        stride = n // max_size
+        D_small = D_np[::stride, ::stride]
+        plt.figure(figsize=figsize)
+        sns.heatmap(D_small, cmap='coolwarm', xticklabels=False, yticklabels=False)
+        plt.title(f"{title} (downsampled {stride}x)")
+    else:
+        plt.figure(figsize=figsize)
+        sns.heatmap(D_np, cmap='coolwarm', xticklabels=False, yticklabels=False)
+        plt.title(title)
+    
     plt.tight_layout()
     plt.show()
+    
+    # Free memory
+    del D_np
+    if 'D_small' in locals():
+        del D_small
+    plt.close()
 
 
+# def run_fastscbatch_pipeline(file1, file2):
+#     device = "cuda" if torch.cuda.is_available() else "cpu"
+#     print("Running on:", device)
+
+#     # Step 1: Preprocess
+#     adata = preprocess_for_fastscbatch(file1, file2)
+#     batch = adata.obs["batch_id"]
+#     # X_df = pd.DataFrame(adata.X.T, index=adata.var_names, columns=adata.obs_names)
+#     # X_df = pd.DataFrame(adata.X.toarray().T, index=adata.var_names, columns=adata.obs_names)
+#     if not isinstance(adata.X, np.ndarray):
+#         X_matrix = adata.X.toarray()
+#     else:
+#         X_matrix = adata.X
+#     X_df = pd.DataFrame(X_matrix.T, index=adata.var_names, columns=adata.obs_names)
+
+#     batch_df = pd.DataFrame(batch.values, index=adata.obs_names)
+
+#     # Step 2: Correlation matrix (raw)
+#     # print("Computing raw correlation matrix...")
+#     # # corr_raw = torch.tensor(np.corrcoef(adata.X.T), dtype=torch.float32, device=device)
+#     # # Ensure dense array
+#     # X_dense = adata.X.toarray() if not isinstance(adata.X, np.ndarray) else adata.X
+#     # corr_raw = torch.tensor(np.corrcoef(X_dense.T), dtype=torch.float32, device=device)
+
+#     # Step 2: Correlation matrix calculation
+#     print("Computing raw correlation matrix...")
+#     # Use float32 to save memory
+#     X_dense = adata.X.toarray() if not isinstance(adata.X, np.ndarray) else adata.X
+#     X_dense = X_dense.astype(np.float32)  # Use float32 to save memory
+    
+#     # Calculate correlation in chunks if matrix is large
+#     n_features = X_dense.shape[1]
+#     if n_features > 10000:  # Arbitrary threshold
+#         print(f"Large feature space detected ({n_features}), calculating correlation in chunks")
+#         # Calculate correlation in chunks to save memory
+#         corr_raw = calculate_correlation_in_chunks(X_dense.T, chunk_size=2000)
+#     else:
+#         corr_raw = np.corrcoef(X_dense.T)
+    
+#     # Move to device after calculation
+#     corr_raw = torch.tensor(corr_raw, dtype=torch.float32, device=device)
+    
+#     # Free memory
+#     del X_dense
+#     torch.cuda.empty_cache() if device == "cuda" else None
+
+
+#     # Step 3: Quantile normalization
+#     batch_tensor = torch.tensor(batch.cat.codes.values, dtype=torch.long, device=device)
+#     print("Applying quantile normalization...")
+#     # corr_corrected = torch_quantile_normalize_correlation(corr_raw.clone(), batch_tensor)
+#     # corr_corrected = optimized_quantile_normalize_correlation(corr_raw.clone(), batch_tensor)
+#     corr_corrected = memory_efficient_quantile_normalize(corr_raw.clone(), batch_tensor, chunk_size=500)
+
+#     # Step 4: Visual diagnostics
+#     plot_corr_heatmap(corr_raw, "Raw Correlation Matrix")
+#     plot_corr_heatmap(corr_corrected, "Corrected Correlation Matrix (Quantile Normalized)")
+
+#     # Step 5: Prepare for solver
+#     D_df = pd.DataFrame(corr_corrected.cpu().numpy(), index=adata.obs_names, columns=adata.obs_names)
+#     corrected = solver(
+#         X=X_df,
+#         D=D_df,
+#         batch=batch_df,
+#         k=10,
+#         c=10,
+#         p=0.15,
+#         EPOCHS=(30, 90, 80),
+#         lr=(0.002, 0.004, 0.008),
+#         device=device,
+#         verbose=True
+#     )
+
+#     # Step 6: Store in AnnData
+#     adata.obsm["X_fastscbatch"] = corrected.T.loc[adata.obs_names].values
+#     print("✅ Fast-scBatch pipeline completed!")
+
+#     return adata
 
 def run_fastscbatch_pipeline(file1, file2):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Running on:", device)
-
+    
     # Step 1: Preprocess
     adata = preprocess_for_fastscbatch(file1, file2)
     batch = adata.obs["batch_id"]
-    # X_df = pd.DataFrame(adata.X.T, index=adata.var_names, columns=adata.obs_names)
-    # X_df = pd.DataFrame(adata.X.toarray().T, index=adata.var_names, columns=adata.obs_names)
+    
+    # Free memory after preprocessing
+    torch.cuda.empty_cache() if device == "cuda" else None
+    
+    # Step 2: Correlation matrix calculation
+    print("Computing raw correlation matrix...")
+    # Use float32 to save memory
+    X_dense = adata.X.toarray() if not isinstance(adata.X, np.ndarray) else adata.X
+    X_dense = X_dense.astype(np.float32)  # Use float32 to save memory
+    
+    # Calculate correlation in chunks if matrix is large
+    n_features = X_dense.shape[1]
+    if n_features > 10000:  # Arbitrary threshold
+        print(f"Large feature space detected ({n_features}), calculating correlation in chunks")
+        # Calculate correlation in chunks to save memory
+        corr_raw = calculate_correlation_in_chunks(X_dense.T, chunk_size=2000)
+    else:
+        corr_raw = np.corrcoef(X_dense.T)
+    
+    # Move to device after calculation
+    corr_raw = torch.tensor(corr_raw, dtype=torch.float32, device=device)
+    
+    # Free memory
+    del X_dense
+    torch.cuda.empty_cache() if device == "cuda" else None
+    
+    # Step 3: Quantile normalization
+    batch_tensor = torch.tensor(batch.cat.codes.values, dtype=torch.long, device=device)
+    print("Applying quantile normalization...")
+    corr_corrected = memory_efficient_quantile_normalize(corr_raw.clone(), batch_tensor, chunk_size=500)
+    
+    # Free memory
+    torch.cuda.empty_cache() if device == "cuda" else None
+    
+    # Step 4: Visual diagnostics with downsampling for large matrices
+    plot_corr_heatmap(corr_raw, "Raw Correlation Matrix", max_size=1000)
+    plot_corr_heatmap(corr_corrected, "Corrected Correlation Matrix (Quantile Normalized)", max_size=1000)
+    
+    # Free more memory
+    del corr_raw
+    torch.cuda.empty_cache() if device == "cuda" else None
+    
+    # Step 5: Prepare for solver
+    D_df = pd.DataFrame(corr_corrected.cpu().numpy(), index=adata.obs_names, columns=adata.obs_names)
+    del corr_corrected  # Free memory immediately
+    torch.cuda.empty_cache() if device == "cuda" else None
+    
+    # For X_df, prevent duplicate computation of X.T
     if not isinstance(adata.X, np.ndarray):
         X_matrix = adata.X.toarray()
     else:
         X_matrix = adata.X
     X_df = pd.DataFrame(X_matrix.T, index=adata.var_names, columns=adata.obs_names)
-
+    del X_matrix  # Free memory
+    
     batch_df = pd.DataFrame(batch.values, index=adata.obs_names)
-
-    # Step 2: Correlation matrix (raw)
-    print("Computing raw correlation matrix...")
-    # corr_raw = torch.tensor(np.corrcoef(adata.X.T), dtype=torch.float32, device=device)
-    # Ensure dense array
-    X_dense = adata.X.toarray() if not isinstance(adata.X, np.ndarray) else adata.X
-    corr_raw = torch.tensor(np.corrcoef(X_dense.T), dtype=torch.float32, device=device)
-
-
-    # Step 3: Quantile normalization
-    batch_tensor = torch.tensor(batch.cat.codes.values, dtype=torch.long, device=device)
-    print("Applying quantile normalization...")
-    # corr_corrected = torch_quantile_normalize_correlation(corr_raw.clone(), batch_tensor)
-    corr_corrected = optimized_quantile_normalize_correlation(corr_raw.clone(), batch_tensor)
-
-    # Step 4: Visual diagnostics
-    plot_corr_heatmap(corr_raw, "Raw Correlation Matrix")
-    plot_corr_heatmap(corr_corrected, "Corrected Correlation Matrix (Quantile Normalized)")
-
-    # Step 5: Prepare for solver
-    D_df = pd.DataFrame(corr_corrected.cpu().numpy(), index=adata.obs_names, columns=adata.obs_names)
+    
+    # Step 6: Run solver
     corrected = solver(
         X=X_df,
         D=D_df,
@@ -259,13 +501,46 @@ def run_fastscbatch_pipeline(file1, file2):
         device=device,
         verbose=True
     )
-
-    # Step 6: Store in AnnData
+    
+    # Step 7: Store in AnnData
     adata.obsm["X_fastscbatch"] = corrected.T.loc[adata.obs_names].values
     print("✅ Fast-scBatch pipeline completed!")
-
+    
     return adata
 
+# Helper function for chunked correlation calculation
+def calculate_correlation_in_chunks(X, chunk_size=2000):
+    """Calculate correlation matrix in chunks to save memory"""
+    n = X.shape[0]
+    corr = np.zeros((n, n), dtype=np.float32)
+    
+    for i in range(0, n, chunk_size):
+        end_i = min(i + chunk_size, n)
+        print(f"Computing correlation chunk {i//chunk_size + 1}/{(n+chunk_size-1)//chunk_size}")
+        
+        # Process upper triangular part of the correlation matrix
+        for j in range(i, n, chunk_size):
+            end_j = min(j + chunk_size, n)
+            
+            # Calculate correlation for this chunk
+            X_i = X[i:end_i]
+            X_j = X[j:end_j]
+            
+            # Normalize data for correlation calculation
+            X_i_norm = (X_i - X_i.mean(axis=1, keepdims=True)) / X_i.std(axis=1, keepdims=True)
+            X_j_norm = (X_j - X_j.mean(axis=1, keepdims=True)) / X_j.std(axis=1, keepdims=True)
+            
+            # Calculate correlation
+            chunk_corr = X_i_norm @ X_j_norm.T / X_i_norm.shape[1]
+            
+            # Store in the correlation matrix
+            corr[i:end_i, j:end_j] = chunk_corr
+            
+            # Mirror for lower triangular if not on diagonal
+            if i != j:
+                corr[j:end_j, i:end_i] = chunk_corr.T
+    
+    return corr
 
 if __name__ == "__main__":
     # Example usage
