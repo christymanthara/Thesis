@@ -52,7 +52,42 @@ def torch_quantile_normalize_vector(v1, v2):
     # Make sure ranks is long type for indexing
     return v2_sorted[ranks.long()]
 
+@torch.jit.script
+def faster_quantile_normalize_vector(v1, v2):
+    """
+    Normalize v1 to the distribution of v2 using quantile normalization.
+    Handles different sized vectors safely.
+    """
+    # Sort v1 and get ranks
+    v1_sorted, sort_indices = torch.sort(v1)
+    ranks = torch.argsort(sort_indices)
+    
+    # Get quantiles from v2 based on relative positions
+    if len(v1) != len(v2):
+        # Need to interpolate v2 values to match v1 length
+        v2_sorted = torch.sort(v2)[0]
+        
+        # Create interpolated values
+        if len(v2) > 1:
+            indices = torch.linspace(0, len(v2)-1, len(v1), device=v1.device)
+            indices_floor = indices.floor().long()
+            indices_ceil = indices.ceil().long()
+            weights_ceil = indices - indices_floor
+            weights_floor = 1 - weights_ceil
+            
+            # Interpolate
+            v2_interp = weights_floor * v2_sorted[indices_floor] + weights_ceil * v2_sorted[indices_ceil]
+        else:
+            # If v2 has only one element, use it for all positions
+            v2_interp = v2_sorted.repeat(len(v1))
+    else:
+        # Same length, no interpolation needed
+        v2_interp = torch.sort(v2)[0]
+    
+    # Return normalized values
+    return v2_interp[ranks]
 
+@torch.compile
 def torch_quantile_normalize_correlation(D, batch_tensor):
     device = D.device
     n = D.shape[0]
@@ -82,6 +117,7 @@ def torch_quantile_normalize_correlation(D, batch_tensor):
             print(f"Normalizing within-batch block for batch {i}")
             block = D[i_idx][:, i_idx].flatten()
             D[i_idx][:, i_idx] = torch_quantile_normalize_vector(block, ref_sorted).reshape(len(i_idx), len(i_idx))
+            D[i_idx][:, i_idx] = torch_quantile_normalize_vector(block, ref_sorted).reshape(len(i_idx), len(i_idx))
         for j in unique_batches:
             j = j.item()
             if i != j:
@@ -101,6 +137,68 @@ def torch_quantile_normalize_correlation(D, batch_tensor):
     print("Symmetrizing matrix")
     return 0.5 * (D + D.T)
 
+
+# Modified optimization function that handles blocks of different sizes
+@torch.compile
+def optimized_quantile_normalize_correlation(D, batch_tensor):
+    device = D.device
+    n = D.shape[0]
+    unique_batches = torch.unique(batch_tensor)
+    print(f"Unique batches found: {unique_batches.tolist()}")
+    
+    # Create batch indices dictionary
+    batch_to_indices = {
+        b.item(): (batch_tensor == b).nonzero(as_tuple=True)[0] for b in unique_batches
+    }
+    for b, idx in batch_to_indices.items():
+        print(f"Batch {b} has {len(idx)} samples")
+    
+    # Select reference batch (largest batch)
+    ref_batch = max(batch_to_indices, key=lambda b: len(batch_to_indices[b]))
+    ref_idx = batch_to_indices[ref_batch]
+    print(f"Reference batch selected: {ref_batch} with {len(ref_idx)} samples")
+    
+    ref_block = D[ref_idx][:, ref_idx].flatten()
+    ref_sorted = torch.sort(ref_block)[0]
+    print("Reference block flattened and sorted")
+    
+    # Pre-allocate a tensor for the normalized matrix
+    D_normalized = D.clone()
+    
+    # Process blocks more efficiently with batch processing
+    print("Processing batch blocks...")
+    batch_progress = 0
+    total_batches = len(unique_batches) * (len(unique_batches) + 1) // 2  # Triangular number
+    
+    for i_idx, i in enumerate(unique_batches):
+        i = i.item()
+        i_indices = batch_to_indices[i]
+        
+        # Process within-batch block
+        block = D[i_indices][:, i_indices].flatten()
+        D_normalized[i_indices][:, i_indices] = faster_quantile_normalize_vector(block, ref_sorted).reshape(len(i_indices), len(i_indices))
+        batch_progress += 1
+        print(f"Progress: {batch_progress}/{total_batches} - Within batch {i}")
+        
+        # Process between-batch blocks - only upper triangle to avoid redundancy
+        for j in unique_batches[i_idx+1:]:
+            j = j.item()
+            j_indices = batch_to_indices[j]
+            
+            block = D[i_indices][:, j_indices].flatten()
+            normalized_block = faster_quantile_normalize_vector(block, ref_sorted)
+            reshaped_block = normalized_block.reshape(len(i_indices), len(j_indices))
+            
+            # Set both blocks to maintain symmetry
+            D_normalized[i_indices][:, j_indices] = reshaped_block
+            D_normalized[j_indices][:, i_indices] = reshaped_block.T
+            
+            batch_progress += 1
+            print(f"Progress: {batch_progress}/{total_batches} - Between batches {i} and {j}")
+    
+    # Ensure perfect symmetry
+    print("Symmetrizing matrix")
+    return 0.5 * (D_normalized + D_normalized.T)
 
 
 def plot_corr_heatmap(D, title="Correlation Matrix", figsize=(6,5)):
@@ -140,7 +238,8 @@ def run_fastscbatch_pipeline(file1, file2):
     # Step 3: Quantile normalization
     batch_tensor = torch.tensor(batch.cat.codes.values, dtype=torch.long, device=device)
     print("Applying quantile normalization...")
-    corr_corrected = torch_quantile_normalize_correlation(corr_raw.clone(), batch_tensor)
+    # corr_corrected = torch_quantile_normalize_correlation(corr_raw.clone(), batch_tensor)
+    corr_corrected = optimized_quantile_normalize_correlation(corr_raw.clone(), batch_tensor)
 
     # Step 4: Visual diagnostics
     plot_corr_heatmap(corr_raw, "Raw Correlation Matrix")
