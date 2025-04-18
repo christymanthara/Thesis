@@ -441,17 +441,21 @@ def run_fastscbatch_pipeline(file1, file2):
     X_dense = adata.X.toarray() if not isinstance(adata.X, np.ndarray) else adata.X
     X_dense = X_dense.astype(np.float32)  # Use float32 to save memory
     
-    # Calculate correlation in chunks if matrix is large
+    # Store dimensions for sanity check
+    n_cells = X_dense.shape[0]
     n_features = X_dense.shape[1]
-    if n_features > 10000:  # Arbitrary threshold
-        print(f"Large feature space detected ({n_features}), calculating correlation in chunks")
-        # Calculate correlation in chunks to save memory
-        corr_raw = calculate_correlation_in_chunks(X_dense.T, chunk_size=2000)
-    else:
-        corr_raw = np.corrcoef(X_dense.T)
+    print(f"Data matrix dimensions: {n_cells} cells × {n_features} features")
+    print(f"Number of observation names: {len(adata.obs_names)}")
+    
+    # Calculate correlation in chunks if matrix is large
+    corr_raw = calculate_correlation_in_chunks(X_dense.T, chunk_size=2000)
     
     # Move to device after calculation
     corr_raw = torch.tensor(corr_raw, dtype=torch.float32, device=device)
+    
+    # Verify matrix dimensions before proceeding
+    assert corr_raw.shape[0] == corr_raw.shape[1], "Correlation matrix must be square"
+    assert corr_raw.shape[0] == n_features, f"Expected correlation matrix of size {n_features}×{n_features}, got {corr_raw.shape}"
     
     # Free memory
     del X_dense
@@ -473,8 +477,18 @@ def run_fastscbatch_pipeline(file1, file2):
     del corr_raw
     torch.cuda.empty_cache() if device == "cuda" else None
     
-    # Step 5: Prepare for solver
-    D_df = pd.DataFrame(corr_corrected.cpu().numpy(), index=adata.obs_names, columns=adata.obs_names)
+    # Step 5: Prepare for solver - IMPORTANT FIX HERE
+    # The correlation matrix is for gene×gene, not cell×cell
+    # We need to ensure we're using the correct dimension for the DataFrame
+    print(f"Creating DataFrame with correlation matrix of shape {corr_corrected.shape}")
+    
+    # Use var_names (genes) for correlation matrix DataFrame, not obs_names (cells)
+    if corr_corrected.shape[0] == len(adata.var_names):
+        D_df = pd.DataFrame(corr_corrected.cpu().numpy(), index=adata.var_names, columns=adata.var_names)
+    else:
+        # If it's cell×cell correlation, use obs_names
+        D_df = pd.DataFrame(corr_corrected.cpu().numpy(), index=adata.obs_names, columns=adata.obs_names)
+    
     del corr_corrected  # Free memory immediately
     torch.cuda.empty_cache() if device == "cuda" else None
     
