@@ -57,32 +57,50 @@ def torch_quantile_normalize_correlation(D, batch_tensor):
     device = D.device
     n = D.shape[0]
     unique_batches = torch.unique(batch_tensor)
-    batch_to_indices = {b.item(): (batch_tensor == b).nonzero(as_tuple=True)[0] for b in unique_batches}
+    print(f"Unique batches found: {unique_batches.tolist()}")
+    
+    batch_to_indices = {
+        b.item(): (batch_tensor == b).nonzero(as_tuple=True)[0] for b in unique_batches
+    }
+    for b, idx in batch_to_indices.items():
+        print(f"Batch {b} has {len(idx)} samples")
 
     # reference: largest batch block
     ref_batch = max(batch_to_indices, key=lambda b: len(batch_to_indices[b]))
     ref_idx = batch_to_indices[ref_batch]
+    print(f"Reference batch selected: {ref_batch} with {len(ref_idx)} samples")
+
     ref_block = D[ref_idx][:, ref_idx].flatten()
     ref_sorted = torch.sort(ref_block)[0]
+    print("Reference block flattened and sorted")
 
     # normalize all within and between-batch blocks
     for i in unique_batches:
-        i_idx = batch_to_indices[i.item()]
+        i = i.item()
+        i_idx = batch_to_indices[i]
         if i != ref_batch:
+            print(f"Normalizing within-batch block for batch {i}")
             block = D[i_idx][:, i_idx].flatten()
             D[i_idx][:, i_idx] = torch_quantile_normalize_vector(block, ref_sorted).reshape(len(i_idx), len(i_idx))
         for j in unique_batches:
+            j = j.item()
             if i != j:
-                j_idx = batch_to_indices[j.item()]
+                j_idx = batch_to_indices[j]
+                print(f"Normalizing between-batch block: batch {i} vs batch {j}")
                 block = D[i_idx][:, j_idx].flatten()
                 D[i_idx][:, j_idx] = torch_quantile_normalize_vector(block, ref_sorted).reshape(len(i_idx), len(j_idx))
 
     # column-wise normalization
+    print("Starting column-wise normalization")
     for i in range(n):
+        if i % 100 == 0 or i == n - 1:  # log sparsely for large matrices
+            print(f"Normalizing column {i+1}/{n}")
         D[:, i] = torch_quantile_normalize_vector(D[:, i], ref_sorted)
 
     # symmetrize
+    print("Symmetrizing matrix")
     return 0.5 * (D + D.T)
+
 
 
 def plot_corr_heatmap(D, title="Correlation Matrix", figsize=(6,5)):
