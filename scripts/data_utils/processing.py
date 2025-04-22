@@ -61,6 +61,69 @@ def load_and_preprocess(file1, file2, label_column="labels", use_basename=True):
 
     return full
 
+def load_and_preprocess_re(file1, file2, label_column="labels", use_basename=True, return_separate=True):
+    """
+    Loads two AnnData files, assigns source labels, filters matching cells based on a given column,
+    preprocesses both datasets (filters genes, normalizes, log-transforms, standardizes),
+    and computes PCA. Returns the two processed AnnData objects separately.
+    """
+    # Load the datasets
+    adata1 = anndata.read_h5ad(file1)
+    adata2 = anndata.read_h5ad(file2)
+
+    # Debug print to check file paths
+    print(f"file1 path: {file1}")
+    print(f"file2 path: {file2}")
+
+    # Extract just the filename before ".h5ad"
+    def extract_filename(path):
+        filename = os.path.basename(path)  # Get file name
+        return filename.rsplit('.h5ad', 1)[0]  # Remove the extension
+
+    if use_basename:
+        adata1.obs["source"] = pd.Categorical([extract_filename(file1)] * adata1.n_obs)
+        adata2.obs["source"] = pd.Categorical([extract_filename(file2)] * adata2.n_obs)
+    else:
+        adata1.obs["source"] = pd.Categorical([file1] * adata1.n_obs)
+        adata2.obs["source"] = pd.Categorical([file2] * adata2.n_obs)
+
+    # Debug print to check source labels
+    print("Unique source labels in adata1:", adata1.obs["source"].unique())
+    print("Unique source labels in adata2:", adata2.obs["source"].unique())
+
+    # Filter adata2: keep only cells whose label_column values exist in adata1
+    if label_column in adata2.obs and label_column in adata1.obs:
+        cell_mask = adata2.obs[label_column].isin(adata1.obs[label_column])
+        adata2 = adata2[cell_mask].copy()
+    
+    # Temporarily concatenate for gene filtering to ensure both datasets have the same genes
+    # full = adata1.concatenate(adata2)
+    full = anndata.concat([adata1, adata2])
+    sc.pp.filter_genes(full, min_counts=1)
+    
+    # Get the list of genes to keep
+    genes_to_keep = full.var_names
+    
+    # Now process each dataset separately with the same gene set
+    for adata in [adata1, adata2]:
+        # Keep only the genes that passed filtering in the combined dataset
+        adata._inplace_subset_var(genes_to_keep)
+        
+        # Normalize and log-transform
+        adata.X = adata.X.astype(float)
+        sc.pp.normalize_per_cell(adata, counts_per_cell_after=1_000_000)
+        sc.pp.log1p(adata)
+        
+        # Convert sparse matrix to dense and standardize
+        adata.X = adata.X.toarray()
+        adata.X -= adata.X.mean(axis=0)
+        adata.X /= adata.X.std(axis=0)
+        
+        # Compute PCA
+        adata.obsm["X_pca"] = decomposition.PCA(n_components=50).fit_transform(adata.X)
+    
+    return adata1, adata2
+
 def load_and_preprocess_single(file, label_column="labels", use_basename=True):
     """
     Loads one AnnData file, assigns a source label, filters genes,
@@ -160,12 +223,6 @@ def load_and_preprocess_separately(file1, file2, label_column="labels", use_base
     return adata_processed, new_processed
 
 
-import anndata
-import scanpy as sc
-import scvi
-import numpy as np
-import pandas as pd
-import os
 
 def load_and_preprocess_for_scvi(file1, file2, label_column="labels", use_basename=True,
                                   batch_key="source", n_top_genes=2000, n_latent=30):
