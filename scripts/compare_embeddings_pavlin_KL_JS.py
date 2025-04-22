@@ -48,9 +48,9 @@ def tsne_side_by_side_with_metrics(file1, file2, output_pdf=None):
 
     # === Run t-SNE on both datasets ===
     def run_tsne(X):
-        affinities = openTSNE.affinity.Multiscale(X, perplexities=[50, 500], metric="cosine", n_jobs=4)
+        affinities = openTSNE.affinity.Multiscale(X, perplexities=[50, 500], metric="cosine", n_jobs=8)
         init = openTSNE.initialization.pca(X, random_state=0)
-        tsne = openTSNE.TSNEEmbedding(init, affinities, negative_gradient_method="fft", n_jobs=4)
+        tsne = openTSNE.TSNEEmbedding(init, affinities, negative_gradient_method="fft", n_jobs=8)
         tsne.optimize(n_iter=250, exaggeration=12, momentum=0.5, inplace=True)
         tsne.optimize(n_iter=750, exaggeration=1, momentum=0.8, inplace=True)
         return tsne
