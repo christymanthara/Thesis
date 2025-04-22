@@ -10,6 +10,23 @@ from sklearn.preprocessing import normalize
 from scipy.stats import rankdata
 from fast_scBatch import solver
 
+# Add this to your pipeline.py file
+from sklearn.decomposition import PCA as SklearnPCA
+import numpy as np
+
+class CompatiblePCA(SklearnPCA):
+    def _fit(self, X):
+        """Make compatible with older scikit-learn behavior expected by solver"""
+        self.fit(X)
+        u = self.transform(X)
+        s = np.sqrt(self.explained_variance_)
+        v = self.components_
+        return u, s, v
+
+# Then patch the sklearn import in your code
+import sklearn.decomposition
+sklearn.decomposition.PCA = CompatiblePCA
+
 
 def preprocess_for_fastscbatch(file1, file2, label_column="labels", batch_column="batch_id", use_basename=True):
     adata1 = anndata.read_h5ad(file1)
@@ -424,6 +441,104 @@ def plot_corr_heatmap(D, title="Correlation Matrix", figsize=(6,5), max_size=100
 
 #     return adata
 
+# def run_fastscbatch_pipeline(file1, file2):
+#     device = "cuda" if torch.cuda.is_available() else "cpu"
+#     print("Running on:", device)
+    
+#     # Step 1: Preprocess
+#     adata = preprocess_for_fastscbatch(file1, file2)
+#     batch = adata.obs["batch_id"]
+    
+#     # Free memory after preprocessing
+#     torch.cuda.empty_cache() if device == "cuda" else None
+    
+#     # Step 2: Correlation matrix calculation
+#     print("Computing raw correlation matrix...")
+#     # Use float32 to save memory
+#     X_dense = adata.X.toarray() if not isinstance(adata.X, np.ndarray) else adata.X
+#     X_dense = X_dense.astype(np.float32)  # Use float32 to save memory
+    
+#     # Store dimensions for sanity check
+#     n_cells = X_dense.shape[0]
+#     n_features = X_dense.shape[1]
+#     print(f"Data matrix dimensions: {n_cells} cells × {n_features} features")
+#     print(f"Number of observation names: {len(adata.obs_names)}")
+    
+#     # Calculate correlation in chunks if matrix is large
+#     corr_raw = calculate_correlation_in_chunks(X_dense.T, chunk_size=2000)
+    
+#     # Move to device after calculation
+#     corr_raw = torch.tensor(corr_raw, dtype=torch.float32, device=device)
+    
+#     # Verify matrix dimensions before proceeding
+#     assert corr_raw.shape[0] == corr_raw.shape[1], "Correlation matrix must be square"
+#     assert corr_raw.shape[0] == n_features, f"Expected correlation matrix of size {n_features}×{n_features}, got {corr_raw.shape}"
+    
+#     # Free memory
+#     del X_dense
+#     torch.cuda.empty_cache() if device == "cuda" else None
+    
+#     # Step 3: Quantile normalization
+#     batch_tensor = torch.tensor(batch.cat.codes.values, dtype=torch.long, device=device)
+#     print("Applying quantile normalization...")
+#     corr_corrected = memory_efficient_quantile_normalize(corr_raw.clone(), batch_tensor, chunk_size=500)
+    
+#     # Free memory
+#     torch.cuda.empty_cache() if device == "cuda" else None
+    
+#     # Step 4: Visual diagnostics with downsampling for large matrices
+#     plot_corr_heatmap(corr_raw, "Raw Correlation Matrix", max_size=1000)
+#     plot_corr_heatmap(corr_corrected, "Corrected Correlation Matrix (Quantile Normalized)", max_size=1000)
+    
+#     # Free more memory
+#     del corr_raw
+#     torch.cuda.empty_cache() if device == "cuda" else None
+    
+#     # Step 5: Prepare for solver - IMPORTANT FIX HERE
+#     # The correlation matrix is for gene×gene, not cell×cell
+#     # We need to ensure we're using the correct dimension for the DataFrame
+#     print(f"Creating DataFrame with correlation matrix of shape {corr_corrected.shape}")
+    
+#     # Use var_names (genes) for correlation matrix DataFrame, not obs_names (cells)
+#     if corr_corrected.shape[0] == len(adata.var_names):
+#         D_df = pd.DataFrame(corr_corrected.cpu().numpy(), index=adata.var_names, columns=adata.var_names)
+#     else:
+#         # If it's cell×cell correlation, use obs_names
+#         D_df = pd.DataFrame(corr_corrected.cpu().numpy(), index=adata.obs_names, columns=adata.obs_names)
+    
+#     del corr_corrected  # Free memory immediately
+#     torch.cuda.empty_cache() if device == "cuda" else None
+    
+#     # For X_df, prevent duplicate computation of X.T
+#     if not isinstance(adata.X, np.ndarray):
+#         X_matrix = adata.X.toarray()
+#     else:
+#         X_matrix = adata.X
+#     X_df = pd.DataFrame(X_matrix.T, index=adata.var_names, columns=adata.obs_names)
+#     del X_matrix  # Free memory
+    
+#     batch_df = pd.DataFrame(batch.values, index=adata.obs_names)
+    
+#     # Step 6: Run solver
+#     corrected = solver(
+#         X=X_df,
+#         D=D_df,
+#         batch=batch_df,
+#         k=10,
+#         c=10,
+#         p=0.15,
+#         EPOCHS=(30, 90, 80),
+#         lr=(0.002, 0.004, 0.008),
+#         device=device,
+#         verbose=True
+#     )
+    
+#     # Step 7: Store in AnnData
+#     adata.obsm["X_fastscbatch"] = corrected.T.loc[adata.obs_names].values
+#     print("✅ Fast-scBatch pipeline completed!")
+    
+#     return adata
+
 def run_fastscbatch_pipeline(file1, file2):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("Running on:", device)
@@ -435,8 +550,8 @@ def run_fastscbatch_pipeline(file1, file2):
     # Free memory after preprocessing
     torch.cuda.empty_cache() if device == "cuda" else None
     
-    # Step 2: Correlation matrix calculation
-    print("Computing raw correlation matrix...")
+    # Step 2: Correlation matrix calculation - KEY CHANGE: Calculate cell×cell correlation
+    print("Computing raw correlation matrix (cell×cell)...")
     # Use float32 to save memory
     X_dense = adata.X.toarray() if not isinstance(adata.X, np.ndarray) else adata.X
     X_dense = X_dense.astype(np.float32)  # Use float32 to save memory
@@ -447,15 +562,16 @@ def run_fastscbatch_pipeline(file1, file2):
     print(f"Data matrix dimensions: {n_cells} cells × {n_features} features")
     print(f"Number of observation names: {len(adata.obs_names)}")
     
-    # Calculate correlation in chunks if matrix is large
-    corr_raw = calculate_correlation_in_chunks(X_dense.T, chunk_size=2000)
+    # Calculate CELL×CELL correlation instead of GENE×GENE correlation
+    print("Computing cell×cell correlation matrix...")
+    corr_raw = calculate_correlation_in_chunks(X_dense, chunk_size=2000)  # Note: NOT X_dense.T
     
     # Move to device after calculation
     corr_raw = torch.tensor(corr_raw, dtype=torch.float32, device=device)
     
     # Verify matrix dimensions before proceeding
     assert corr_raw.shape[0] == corr_raw.shape[1], "Correlation matrix must be square"
-    assert corr_raw.shape[0] == n_features, f"Expected correlation matrix of size {n_features}×{n_features}, got {corr_raw.shape}"
+    assert corr_raw.shape[0] == n_cells, f"Expected correlation matrix of size {n_cells}×{n_cells}, got {corr_raw.shape}"
     
     # Free memory
     del X_dense
@@ -477,22 +593,14 @@ def run_fastscbatch_pipeline(file1, file2):
     del corr_raw
     torch.cuda.empty_cache() if device == "cuda" else None
     
-    # Step 5: Prepare for solver - IMPORTANT FIX HERE
-    # The correlation matrix is for gene×gene, not cell×cell
-    # We need to ensure we're using the correct dimension for the DataFrame
+    # Step 5: Prepare for solver - now with cell×cell correlation
     print(f"Creating DataFrame with correlation matrix of shape {corr_corrected.shape}")
-    
-    # Use var_names (genes) for correlation matrix DataFrame, not obs_names (cells)
-    if corr_corrected.shape[0] == len(adata.var_names):
-        D_df = pd.DataFrame(corr_corrected.cpu().numpy(), index=adata.var_names, columns=adata.var_names)
-    else:
-        # If it's cell×cell correlation, use obs_names
-        D_df = pd.DataFrame(corr_corrected.cpu().numpy(), index=adata.obs_names, columns=adata.obs_names)
+    D_df = pd.DataFrame(corr_corrected.cpu().numpy(), index=adata.obs_names, columns=adata.obs_names)
     
     del corr_corrected  # Free memory immediately
     torch.cuda.empty_cache() if device == "cuda" else None
     
-    # For X_df, prevent duplicate computation of X.T
+    # For X_df, prevent duplicate computation
     if not isinstance(adata.X, np.ndarray):
         X_matrix = adata.X.toarray()
     else:
@@ -521,6 +629,7 @@ def run_fastscbatch_pipeline(file1, file2):
     print("✅ Fast-scBatch pipeline completed!")
     
     return adata
+
 
 # Helper function for chunked correlation calculation
 def calculate_correlation_in_chunks(X, chunk_size=2000):
