@@ -3,6 +3,8 @@ import scanpy as sc
 import os
 import pandas as pd  # Ensure pandas handles string assignments correctly
 from sklearn import decomposition
+import scipy
+import numpy as np
 
 def load_and_preprocess(file1, file2, label_column="labels", use_basename=True):
     """
@@ -61,11 +63,10 @@ def load_and_preprocess(file1, file2, label_column="labels", use_basename=True):
 
     return full
 
-def load_and_preprocess_re(file1, file2, label_column="labels", use_basename=True, return_separate=True):
+def load_and_preprocess_re(file1, file2, label_column="labels", use_basename=True):
     """
-    Loads two AnnData files, assigns source labels, filters matching cells based on a given column,
-    preprocesses both datasets (filters genes, normalizes, log-transforms, standardizes),
-    and computes PCA. Returns the two processed AnnData objects separately.
+    Loads two AnnData files, assigns source labels, filters matching cells,
+    preprocesses both datasets, and returns them separately.
     """
     # Load the datasets
     adata1 = anndata.read_h5ad(file1)
@@ -96,17 +97,16 @@ def load_and_preprocess_re(file1, file2, label_column="labels", use_basename=Tru
         cell_mask = adata2.obs[label_column].isin(adata1.obs[label_column])
         adata2 = adata2[cell_mask].copy()
     
-    # Temporarily concatenate for gene filtering to ensure both datasets have the same genes
-    # full = adata1.concatenate(adata2)
+    # Use anndata.concat instead of concatenate
     full = anndata.concat([adata1, adata2])
     sc.pp.filter_genes(full, min_counts=1)
     
     # Get the list of genes to keep
     genes_to_keep = full.var_names
     
-    # Now process each dataset separately with the same gene set
+    # Process each dataset separately
     for adata in [adata1, adata2]:
-        # Keep only the genes that passed filtering in the combined dataset
+        # Keep only the genes that passed filtering
         adata._inplace_subset_var(genes_to_keep)
         
         # Normalize and log-transform
@@ -114,13 +114,37 @@ def load_and_preprocess_re(file1, file2, label_column="labels", use_basename=Tru
         sc.pp.normalize_per_cell(adata, counts_per_cell_after=1_000_000)
         sc.pp.log1p(adata)
         
-        # Convert sparse matrix to dense and standardize
-        adata.X = adata.X.toarray()
-        adata.X -= adata.X.mean(axis=0)
-        adata.X /= adata.X.std(axis=0)
+        # Convert sparse matrix to dense
+        if scipy.sparse.issparse(adata.X):
+            adata.X = adata.X.toarray()
         
-        # Compute PCA
-        adata.obsm["X_pca"] = decomposition.PCA(n_components=50).fit_transform(adata.X)
+        # Standardize safely - avoid division by zero
+        means = adata.X.mean(axis=0)
+        adata.X -= means
+        
+        # Calculate standard deviations and handle zeros
+        stds = adata.X.std(axis=0)
+        # Replace zeros with 1 to avoid division by zero
+        stds[stds == 0] = 1.0
+        adata.X /= stds
+        
+        # Compute PCA, skipping features with NaNs if any remain
+        # First check if there are any NaNs
+        if np.isnan(adata.X).any():
+            print(f"Warning: {np.isnan(adata.X).sum()} NaN values in dataset after preprocessing.")
+            # You could implement additional cleaning here
+        
+        try:
+            adata.obsm["X_pca"] = decomposition.PCA(n_components=50).fit_transform(adata.X)
+        except ValueError as e:
+            print(f"PCA failed: {e}")
+            # Fallback: try to remove NaNs
+            from sklearn.impute import SimpleImputer
+            print("Attempting to impute NaN values...")
+            imputer = SimpleImputer(strategy='mean')
+            adata.obsm["X_pca"] = decomposition.PCA(n_components=50).fit_transform(
+                imputer.fit_transform(adata.X)
+            )
     
     return adata1, adata2
 

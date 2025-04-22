@@ -47,7 +47,7 @@ def tsne_pavlin_re(file1, file2, output_pdf=None):
     print(f"JS Divergence: {js:.4f}")
 
     full = adata1.concatenate(adata2)
-    X = full.obsm["X_scVI"]
+    X = full.obsm["X_pca"]
 
     
     # Compute affinities using multiscale perplexities
