@@ -1,6 +1,6 @@
 import openTSNE
 import scanpy as sc
-from data_utils.processing import load_and_preprocess_re
+from data_utils.processing import load_and_preprocess_re2
 from data_utils.clustering_metrics_KL_JS import compute_kl_divergence, compute_js_divergence
 import utils  # assuming utils.plot is available for plotting
 import os
@@ -17,7 +17,7 @@ def tsne_pavlin_re(file1, file2, output_pdf=None):
                          the filename will be generated based on file names.
     """
     # Preprocess and obtain the concatenated AnnData object.
-    adata1,adata2 = load_and_preprocess_re(file1, file2, use_basename=True)
+    adata1,adata2 = load_and_preprocess_re2(file1, file2, use_basename=True)
 
     # Extract PCA embeddings
     X1 = adata1.obsm["X_pca"]
@@ -77,10 +77,12 @@ def tsne_pavlin_re(file1, file2, output_pdf=None):
         file1_name = os.path.splitext(os.path.basename(file1))[0]
         file2_name = os.path.splitext(os.path.basename(file2))[0]
         # Create the output file name
-        output_pdf = f"tsne_plot_withKL_JS_{file1_name}_{file2_name}.pdf"
+        output_pdf = f"tsne_plot_withKL_JS3_{file1_name}_{file2_name}.pdf"
     
     # Plot using the provided utils.plot function and save the plot
-    utils.plot(embedding, full.obs["source"], save_path=output_pdf)
+    # utils.plot(embedding, full.obs["source"], save_path=output_pdf)
+    utils.plot(embedding, full.obs["source"], save_path=output_pdf, kl_divergence=kl,
+    js_divergence=js, save_as_svg=True)
 
 if __name__ == "__main__":
     # tsne_pavlin("../datasets/baron_2016h.h5ad", "../datasets/xin_2016.h5ad")
