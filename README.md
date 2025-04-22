@@ -175,3 +175,9 @@ project/
 - For large datasets, the computation might be memory-intensive and time-consuming.
 - The independent mapping approach helps identify corresponding cell types across studies without being influenced by batch effects or dataset-specific cluster formations.
 - **Important:** Change normalization from million to 10,000 when processing datasets.
+
+
+use the following for best results. Uses the oneliner format
+```
+ python .\scripts\show_batch_effect_1_concatenated_datasets_re.py pancreas baron_2016h.h5ad xin_2016.h5ad
+```
