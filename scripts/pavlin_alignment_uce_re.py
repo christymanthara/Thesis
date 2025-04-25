@@ -5,6 +5,7 @@ from data_utils.clustering_metrics_KL_JS import compute_kl_divergence, compute_j
 import utils  # assuming utils.plot is available for plotting
 import os
 import anndata
+from tqdm import tqdm
 
 def tsne_uce_re(file1, file2, output_pdf=None):
     """
@@ -19,8 +20,8 @@ def tsne_uce_re(file1, file2, output_pdf=None):
     """
     # Preprocess and obtain the concatenated AnnData object.
     # adata1,adata2 = load_and_preprocess_re2(file1, file2, use_basename=True)
-    adata1 = anndata.read(file1)
-    adata2 = anndata.read(file2)
+    adata1 = anndata.read_h5ad(file1)
+    adata2 = anndata.read_h5ad(file2)
 
         # Extract just the filename before ".h5ad"
     def extract_filename(path):
@@ -87,9 +88,13 @@ def tsne_uce_re(file1, file2, output_pdf=None):
         n_jobs=8,
     )
     
-    # Optimize the embedding in two phases
-    embedding.optimize(n_iter=250, exaggeration=12, momentum=0.5, inplace=True)
-    embedding.optimize(n_iter=750, exaggeration=1, momentum=0.8, inplace=True)
+    print("Optimizing embedding (phase 1)...")
+    for _ in tqdm(range(250)):
+        embedding.optimize(n_iter=1, exaggeration=12, momentum=0.5, inplace=True)
+    
+    print("Optimizing embedding (phase 2)...")
+    for _ in tqdm(range(750)):
+        embedding.optimize(n_iter=1, exaggeration=1, momentum=0.8, inplace=True)
     
     # Generate default output_pdf name if not provided
     if output_pdf is None:
