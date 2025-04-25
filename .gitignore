@@ -18,3 +18,8 @@ UCE
 *.svg
 !reports/*.svg
 scripts/cuda_test.py
+
+temp
+venvThesisscgpt
+
+scripts/fastsc_Batch/__pycache__
