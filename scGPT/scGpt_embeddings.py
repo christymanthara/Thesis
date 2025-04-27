@@ -112,7 +112,7 @@ if __name__ == "__main__":
     adata2 = anndata.read_h5ad(file2)
     adata2.var['gene_name'] = adata2.var.index
     
-    model_dir = "/home/thechristyjo/Documents/Thesis/scGPT/scGPT/model"
+    model_dir = "/home/thechristyjo/Documents/Thesis/scGPT/model"
     
     # Extract short filenames without paths and extensions
     file1_name = os.path.splitext(os.path.basename(file1))[0]
