@@ -9,13 +9,15 @@ import pandas as pd
 import sys
 import scgpt as scg
 import anndata
+import os
 
 
 def embed_and_visualize(
     reference_adata,
     query_adata,
     model_dir,
-    # cell_type_key="celltype",
+    file1_name="file1",
+    file2_name="file2",
     cell_type_key="labels",
     gene_col="gene_name",
     batch_size=64,
@@ -24,31 +26,12 @@ def embed_and_visualize(
     """
     Embed reference and query AnnData objects using scGPT and visualize the combined data.
     
-    Parameters:
-    -----------
-    reference_adata : AnnData
-        Reference dataset to be embedded
-    query_adata : AnnData
-        Query dataset to be embedded
-    model_dir : str or Path
-        Path to the scGPT model directory
-    cell_type_key : str, default="celltype"
-        Key in adata.obs containing cell type annotations
-    gene_col : str, default="gene_name"
-        Column name for gene identifiers
-    batch_size : int, default=64
-        Batch size for embedding
-    return_combined : bool, default=True
-        Whether to return the combined AnnData object
-        
-    Returns:
-    --------
-    If return_combined=True, returns the combined AnnData object with embeddings
-    Otherwise, returns a tuple of (reference_embed_adata, query_embed_adata)
+    Saves:
+    - ref_embed_adata as {file1_name}_scGPT.h5ad
+    - query_embed_adata as {file2_name}_scGPT.h5ad
+    - adata_concat as adata_concat_scGPT_{file1_name}_{file2_name}.h5ad
     """
-    # import scanpy as sc
-    # import scgpt as scg
-    
+
     # Check for FAISS
     try:
         import faiss
@@ -73,6 +56,10 @@ def embed_and_visualize(
         gene_col=gene_col,
         batch_size=batch_size,
     )
+
+    # Save embedded datasets
+    ref_embed_adata.write_h5ad(f"{file1_name}_scGPT.h5ad")
+    query_embed_adata.write_h5ad(f"{file2_name}_scGPT.h5ad")
     
     if not return_combined:
         return ref_embed_adata, query_embed_adata
@@ -87,8 +74,7 @@ def embed_and_visualize(
     # Ensure the cell type column exists
     if cell_type_key not in adata_concat.obs.columns:
         raise ValueError(f"'{cell_type_key}' not found in obs. Available columns: {adata_concat.obs.columns.tolist()}")
-
-
+    
     # Mask the query dataset cell types
     adata_concat.obs[cell_type_key] = adata_concat.obs[cell_type_key].astype("category")
     adata_concat.obs[cell_type_key] = adata_concat.obs[cell_type_key].cat.add_categories(["To be predicted"])
@@ -103,6 +89,13 @@ def embed_and_visualize(
         adata_concat, color=["is_ref", cell_type_key], wspace=0.4, frameon=False, ncols=1
     )
     
+    # Save concatenated dataset
+    concat_filename = f"adata_concat_scGPT_{file1_name}_{file2_name}.h5ad"
+    adata_concat.write_h5ad(concat_filename)
+
+    print(f"Saved {file1_name}_scGPT.h5ad, {file2_name}_scGPT.h5ad, and {concat_filename}")
+
+    
     return adata_concat
 
 
@@ -112,10 +105,17 @@ if __name__ == "__main__":
     file1 = "/home/thechristyjo/Documents/Thesis/Datasets/baron_2016h.h5ad"
     # file2 = "temp/Datasets/lung/sample_proc_lung_train.h5ad"
     file2 = "/home/thechristyjo/Documents/Thesis/datasets/xin_2016.h5ad"
-    adata = anndata.io.read_h5ad(file1)
+    
+    adata = anndata.read_h5ad(file1)
     adata.var['gene_name'] = adata.var.index
-    adata2 = anndata.io.read_h5ad(file2)
+    
+    adata2 = anndata.read_h5ad(file2)
     adata2.var['gene_name'] = adata2.var.index
-    # model_dir = "scripts/scGPT/model"
+    
     model_dir = "/home/thechristyjo/Documents/Thesis/scGPT/scGPT/model"
-    embed_and_visualize(adata,adata2, model_dir)
+    
+    # Extract short filenames without paths and extensions
+    file1_name = os.path.splitext(os.path.basename(file1))[0]
+    file2_name = os.path.splitext(os.path.basename(file2))[0]
+    
+    embed_and_visualize(adata, adata2, model_dir, file1_name=file1_name, file2_name=file2_name)
