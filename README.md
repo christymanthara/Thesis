@@ -181,3 +181,7 @@ use the following for best results. Uses the oneliner format
 ```
  python .\scripts\show_batch_effect_1_concatenated_datasets_re.py pancreas baron_2016h.h5ad xin_2016.h5ad
 ```
+
+
+adata_concat_scGPT - embedded individually and then concatenated.
+concat_embedded_file1_file2 -concatenated and embedded with scgpt
