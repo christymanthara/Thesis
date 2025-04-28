@@ -372,3 +372,26 @@ def load_and_preprocess_for_scvi(file1, file2, label_column="labels", use_basena
     adata2_out = full[full.obs[batch_key] == label2].copy()
 
     return adata1_out, adata2_out
+
+def load_and_label_scGPT(file1, file2, use_basename=True):
+    """
+    Loads two AnnData files, assigns source labels, concatenates them, and returns the combined AnnData.
+    """
+    adata1 = anndata.read_h5ad(file1)
+    adata2 = anndata.read_h5ad(file2)
+
+    # Add 'source' to obs
+    if use_basename:
+        source1 = os.path.splitext(os.path.basename(file1))[0]
+        source2 = os.path.splitext(os.path.basename(file2))[0]
+    else:
+        source1 = file1
+        source2 = file2
+
+    adata1.obs["source"] = pd.Categorical([source1] * adata1.n_obs)
+    adata2.obs["source"] = pd.Categorical([source2] * adata2.n_obs)
+
+    # Concatenate datasets
+    adata_combined = anndata.concat([adata1, adata2], join="inner", label="batch", keys=["dataset1", "dataset2"])
+
+    return adata_combined
