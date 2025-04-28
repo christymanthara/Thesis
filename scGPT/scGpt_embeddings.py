@@ -178,7 +178,12 @@ def concat_and_embed(
     # adata_concat.write_h5ad(concat_filename)
 
      # Load and label
-    combined_adata = load_and_label_scGPT(file1, file2)
+    combined_adata, source1, source2 = load_and_label_scGPT(file1, file2)
+
+    # Save the concatenated raw file
+    concat_filename = f"{source1}{source2}.h5ad"
+    combined_adata.write(concat_filename)
+    print(f"Concatenated dataset saved to {concat_filename}")
 
     # Prepare genes
     combined_adata.var['gene_name'] = combined_adata.var.index
@@ -199,22 +204,25 @@ def concat_and_embed(
     sc.pl.umap(embedded_adata, color=["source"], wspace=0.4, frameon=False, ncols=1)
 
     # Save
-    embedded_adata.write_h5ad("concat_embedded.h5ad")
+    # embedded_adata.write_h5ad("concat_embedded.h5ad")
+    embedded_filename = f"concat_embedded_{source1}_{source2}.h5ad"
+    embedded_adata.write(embedded_filename)
+    print(f"Embedded dataset saved to {embedded_filename}")
 
 
 if __name__ == "__main__":
     # file1 = "temp/Datasets/lung/sample_proc_lung_test.h5ad"
-    # file1 = "/home/thechristyjo/Documents/Thesis/Datasets/baron_2016h.h5ad"
+    file1 = "/home/thechristyjo/Documents/Thesis/Datasets/baron_2016h.h5ad"
     # file1 = "/home/thechristyjo/Documents/Thesis/Datasets/chen_2017.h5ad"
     # file1 = "Datasets/macosko_2015.h5ad"
-    file1 = "/home/thechristyjo/Documents/Thesis/Datasets/sample_proc_lung_train.h5ad"
+    # file1 = "/home/thechristyjo/Documents/Thesis/Datasets/sample_proc_lung_train.h5ad"
 
 
     # file2 = "temp/Datasets/lung/sample_proc_lung_train.h5ad"
-    # file2 = "/home/thechristyjo/Documents/Thesis/datasets/xin_2016.h5ad"
+    file2 = "/home/thechristyjo/Documents/Thesis/datasets/xin_2016.h5ad"
     # file2 = "/home/thechristyjo/Documents/Thesis/Datasets/hrvatin_2018.h5ad"
     # file2 = "Datasets/shekhar_2016.h5ad"
-    file2 = "/home/thechristyjo/Documents/Thesis/Datasets/sample_proc_lung_test.h5ad"
+    # file2 = "/home/thechristyjo/Documents/Thesis/Datasets/sample_proc_lung_test.h5ad"
 
     adata = anndata.read_h5ad(file1)
     adata.var['gene_name'] = adata.var.index
@@ -230,5 +238,5 @@ if __name__ == "__main__":
     
     # embed_and_visualize(adata, adata2, model_dir, file1_name=file1_name, file2_name=file2_name)
     concat_and_embed(
-        adata, adata2, model_dir, file1_name=file1_name, file2_name=file2_name
+        adata, adata2, model_dir, file1_name=file1_name, file2_name=file2_name, cell_type_key="labels"
     )

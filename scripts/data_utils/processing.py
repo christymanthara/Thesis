@@ -394,4 +394,4 @@ def load_and_label_scGPT(file1, file2, use_basename=True):
     # Concatenate datasets
     adata_combined = anndata.concat([adata1, adata2], join="inner", label="batch", keys=["dataset1", "dataset2"])
 
-    return adata_combined
+    return adata_combined, source1, source2
