@@ -212,16 +212,16 @@ def concat_and_embed(
 
 if __name__ == "__main__":
     # file1 = "temp/Datasets/lung/sample_proc_lung_test.h5ad"
-    file1 = "/home/thechristyjo/Documents/Thesis/Datasets/baron_2016h.h5ad"
+    # file1 = "/home/thechristyjo/Documents/Thesis/Datasets/baron_2016h.h5ad"
     # file1 = "/home/thechristyjo/Documents/Thesis/Datasets/chen_2017.h5ad"
-    # file1 = "Datasets/macosko_2015.h5ad"
+    file1 = "Datasets/macosko_2015.h5ad"
     # file1 = "/home/thechristyjo/Documents/Thesis/Datasets/sample_proc_lung_train.h5ad"
 
 
     # file2 = "temp/Datasets/lung/sample_proc_lung_train.h5ad"
-    file2 = "/home/thechristyjo/Documents/Thesis/datasets/xin_2016.h5ad"
+    # file2 = "/home/thechristyjo/Documents/Thesis/datasets/xin_2016.h5ad"
     # file2 = "/home/thechristyjo/Documents/Thesis/Datasets/hrvatin_2018.h5ad"
-    # file2 = "Datasets/shekhar_2016.h5ad"
+    file2 = "Datasets/shekhar_2016.h5ad"
     # file2 = "/home/thechristyjo/Documents/Thesis/Datasets/sample_proc_lung_test.h5ad"
 
     adata = anndata.read_h5ad(file1)
