@@ -184,4 +184,6 @@ use the following for best results. Uses the oneliner format
 
 
 adata_concat_scGPT - embedded individually and then concatenated.
-concat_embedded_file1_file2 -concatenated and embedded with scgpt
+concat_embedded_file1_file2 -concatenated and embedded with scgpt   
+
+python -m scGPT.scGpt_embeddings
