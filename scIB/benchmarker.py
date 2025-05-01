@@ -6,15 +6,17 @@ import matplotlib.pyplot as plt
 
 import scvi.model as scvimodel
 
+
 # %matplotlib inline
 
-def benchmark_scib(adata):
+def benchmark_scib(adata_path):
     """
     Benchmark the given AnnData object using scIB metrics.
     """
 
 
-    import numpy as np
+    adata = sc.read(adata_path)
+    adata.uns["filename"] = os.path.splitext(os.path.basename(adata_path))[0]
 
     # Check number of non-zero entries
     print("Non-zero entries in adata.X:", adata.X.nnz if hasattr(adata.X, 'nnz') else np.count_nonzero(adata.X))
@@ -105,13 +107,20 @@ def benchmark_scib(adata):
 
 
     bm.plot_results_table()
-    plt.show()
+    filename = adata.uns.get("filename", "adata")  # fallback if filename not stored
+    plt.savefig(f"scib_benchmark_results_{filename}.pdf", bbox_inches="tight")
+    plt.savefig(f"scib_benchmark_results_{filename}.svg", bbox_inches="tight")
+    # plt.show()
+    # plt.show()
 
 
 if __name__ == "__main__":
     # Load your AnnData object
-    adata = sc.read("/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_baron_2016h_xin_2016.h5ad")
+    # adata = sc.read("/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_baron_2016h_xin_2016.h5ad")
     # adata = sc.read("/home/thechristyjo/Documents/Thesis/shekhar_2016_scGPT.h5ad")
     # adata = sc.read("/home/thechristyjo/Documents/Thesis/datasets/baron_2016h.h5ad")
     # Run the benchmark
-    benchmark_scib(adata)
+    # benchmark_scib(adata)
+    benchmark_scib("/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_baron_2016h_xin_2016.h5ad")
+    benchmark_scib("/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_chen_2017_hrvatin_2018.h5ad")
+    benchmark_scib("/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_macosko_2015_shekhar_2016.h5ad")
