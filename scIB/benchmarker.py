@@ -95,14 +95,14 @@ def benchmark_scib(adata_path):
     adata.obs["cell_type"] = adata.obs["labels"]
     print(adata.obs["cell_type"].value_counts())
 
-
+    embedding_keys = ["Unintegrated", "scVI", "scANVI", "X_scGPT"]
     bm = Benchmarker(
         adata,
         batch_key="batch_id",
         label_key="labels",
         bio_conservation_metrics=BioConservation(),
         batch_correction_metrics=BatchCorrection(),
-        embedding_obsm_keys=["Unintegrated","scVI","scANVI","X_scGPT"],
+        embedding_obsm_keys=embedding_keys,
         n_jobs=2,
     )
     bm.benchmark()
@@ -114,6 +114,8 @@ def benchmark_scib(adata_path):
     table = bm.plot_results_table()     # Pass ax explicitly
 
     
+    # Create a string with the embedding keys for the filename
+    embedding_str = "_".join([key.replace("X_", "") for key in embedding_keys])
 
     # tab = Table(pd.DataFrame(table), ax=ax)
     print("the table type is ",type(table))
@@ -121,9 +123,15 @@ def benchmark_scib(adata_path):
     table_fig = table.ax.figure 
 
     # Save the table's figure (not your empty fig)
-    filename = adata.uns.get("filename", "adata") 
-    table_fig.savefig(f"scib_benchmark_results_{filename}.pdf", bbox_inches="tight")
-    table_fig.savefig(f"scib_benchmark_results_{filename}.svg", dpi=300,bbox_inches="tight")
+    #get the basename of the adata file
+    base_filename = adata.uns.get("filename", "adata") 
+
+    # Create the new filename with embedding keys
+    output_filename = f"scib_benchmark_{base_filename}_{embedding_str}"
+
+     # Save with the new filename
+    table_fig.savefig(f"{output_filename}.pdf", bbox_inches="tight")
+    table_fig.savefig(f"{output_filename}.svg", dpi=300, bbox_inches="tight")
     
     # table_fig.savefig("table_output.png", dpi=300, bbox_inches="tight")
     # table_fig.savefig("table_output.pdf", bbox_inches="tight")
