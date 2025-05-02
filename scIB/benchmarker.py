@@ -5,7 +5,9 @@ from scib_metrics.benchmark import Benchmarker, BioConservation, BatchCorrection
 import matplotlib.pyplot as plt
 
 import scvi.model as scvimodel
-
+import os
+from plottable import Table
+import pandas as pd
 
 # %matplotlib inline
 
@@ -79,7 +81,9 @@ def benchmark_scib(adata_path):
     )
     lvae.train(max_epochs=20, n_samples_per_label=100)
     adata.obsm["scANVI"] = lvae.get_latent_representation()
-
+    
+    #saving the adata object
+    adata.write_h5ad("test_scGPT_scanvi_scvi_benchmark.h5ad")
     
 
     sc.pp.highly_variable_genes(adata, n_top_genes=2000, flavor="cell_ranger", batch_key="batch_id")
@@ -106,11 +110,26 @@ def benchmark_scib(adata_path):
     print(bm.get_results())
 
 
-    bm.plot_results_table()
-    filename = adata.uns.get("filename", "adata")  # fallback if filename not stored
-    plt.savefig(f"scib_benchmark_results_{filename}.pdf", bbox_inches="tight")
-    plt.savefig(f"scib_benchmark_results_{filename}.svg", bbox_inches="tight")
-    # plt.show()
+    fig,ax= plt.subplots(figsize=(12, 5))  # Adjust size as needed
+    table = bm.plot_results_table()     # Pass ax explicitly
+
+    
+
+    # tab = Table(pd.DataFrame(table), ax=ax)
+    print("the table type is ",type(table))
+
+    table_fig = table.ax.figure 
+
+    # Save the table's figure (not your empty fig)
+    filename = adata.uns.get("filename", "adata") 
+    table_fig.savefig(f"scib_benchmark_results_{filename}.pdf", bbox_inches="tight")
+    table_fig.savefig(f"scib_benchmark_results_{filename}.svg", dpi=300,bbox_inches="tight")
+    
+    # table_fig.savefig("table_output.png", dpi=300, bbox_inches="tight")
+    # table_fig.savefig("table_output.pdf", bbox_inches="tight")
+    plt.figure(table_fig.number)
+
+
     # plt.show()
 
 
@@ -121,6 +140,7 @@ if __name__ == "__main__":
     # adata = sc.read("/home/thechristyjo/Documents/Thesis/datasets/baron_2016h.h5ad")
     # Run the benchmark
     # benchmark_scib(adata)
-    benchmark_scib("/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_baron_2016h_xin_2016.h5ad")
-    benchmark_scib("/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_chen_2017_hrvatin_2018.h5ad")
+    # benchmark_scib("/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_baron_2016h_xin_2016.h5ad")
+    # benchmark_scib("/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_chen_2017_hrvatin_2018.h5ad")
     benchmark_scib("/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_macosko_2015_shekhar_2016.h5ad")
+    # benchmark_scib("/home/thechristyjo/Documents/Thesis/test_scGPT_scanvi_scvi_benchmark.h5ad")
