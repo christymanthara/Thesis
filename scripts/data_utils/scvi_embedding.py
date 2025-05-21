@@ -67,5 +67,15 @@ def load_and_preprocess_for_scvi(file1, file2, label_column="labels", use_basena
     # Split back the datasets
     adata1_out = full[full.obs[batch_key] == label1].copy()
     adata2_out = full[full.obs[batch_key] == label2].copy()
+    
+    # Save the processed datasets with _scvi suffix
+    output_file1 = os.path.join(os.path.dirname(file1), f"{label1}_scvi.h5ad")
+    output_file2 = os.path.join(os.path.dirname(file2), f"{label2}_scvi.h5ad")
+    
+    print(f"Saving processed files to:\n{output_file1}\n{output_file2}")
+    
+    adata1_out.write(output_file1)
+    adata2_out.write(output_file2)
+    
 
     return adata1_out, adata2_out
