@@ -56,6 +56,16 @@ def plot_scvi_umap(file1,file2 , output_pdf=None, skip_preprocessing=False):
 
     # Create plot
     fig, ax = plt.subplots(ncols=2, figsize=(12, 6))
+    
+    # Add overall title to the figure with actual obs columns
+    file1_name = os.path.splitext(os.path.basename(file1))[0]
+    file2_name = os.path.splitext(os.path.basename(file2))[0]
+    
+    # Get the obs columns (typically includes 'labels' and other metadata)
+    obs_columns = list(adata.obs.columns)
+    obs_str = ','.join(obs_columns)
+    
+    fig.suptitle(f"{file1_name}_{file2_name}_obs[{obs_str}]", fontsize=14, y=0.95)
 
     # Plot reference embedding
     utils.plot(adata.obsm["umap"], adata.obs["labels"], ax=ax[0], title="Reference embedding (UMAP from scVI)", 
@@ -121,4 +131,4 @@ if __name__ == "__main__":
     # plot_scvi_umap("Datasets/baron_2016h.h5ad", "Datasets/xin_2016.h5ad")
     
     # plot_scvi_umap("Datasets/baron_2016h_scvi.h5ad", "Datasets/xin_2016_scvi.h5ad", skip_preprocessing=True)
-    plot_scvi_umap("Datasets/hrvatin_2018_scvi.h5ad", "Datasets/chen_2017_scvi.h5ad",skip_preprocessing=True)
+    plot_scvi_umap("Datasets/hrvatin_2018_scvi.h5ad", "Datasets/chen_2017_scvi.h5ad", skip_preprocessing=True)
