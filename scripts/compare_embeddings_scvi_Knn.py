@@ -101,8 +101,12 @@ def plot_scvi_umap(file1,file2 , output_pdf=None, skip_preprocessing=False):
         plt.text(0, 1.02, letter, transform=ax_.transAxes, fontsize=15, fontweight="bold")
         
     # Add KNN accuracy text to the figure
-    fig.text(0.5, 0.02, f"KNN(scVI): {scvi_accuracy:.4f}    |    KNN(UMAP): {umap_accuracy:.4f}", 
+    fig.text(0.5, 0.10, f"KNN(scVI): {scvi_accuracy:.4f}    |    KNN(UMAP): {umap_accuracy:.4f}", 
              ha='center', fontsize=12)
+    
+    #  # Adjust layout to prevent overlap
+    # plt.tight_layout()
+    # plt.subplots_adjust(bottom=0.25)  # Make room for KNN text and legend
 
 
     # Save figure
