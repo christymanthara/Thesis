@@ -10,21 +10,24 @@ import scvi
 import utils
 import os
 
-def plot_scvi_umap(file1,file2 , output_pdf=None):
-    # Load the data
-    # adata = anndata.read_h5ad("baron_embedding_tsne_3000_genes.h5ad")
-    # new = anndata.read_h5ad("baron_transform_tsne_1000_genes.h5ad")
-
-    # Load and preprocess both datasets
-    print(f"Loading and preprocessing {file1}")
-    # adata1 = load_and_preprocess_single(file1, use_basename=True)
-
-    print(f"Loading and preprocessing {file2}")
-    # adata2 = load_and_preprocess_single(file2, use_basename=True)
-    adata,new = load_and_preprocess_for_scvi(file1,file2)
-
-
+def plot_scvi_umap(file1,file2 , output_pdf=None, skip_preprocessing=False):
     # Step 1: Set up scVI model for reference data
+    if skip_preprocessing:
+        # Load data directly without preprocessing
+        print(f"Loading {file1} directly (skipping preprocessing)")
+        adata = anndata.read_h5ad(file1)
+        
+        print(f"Loading {file2} directly (skipping preprocessing)")
+        new = anndata.read_h5ad(file2)
+        
+        # Check if X_scVI embeddings exist
+        if 'X_scVI' not in adata.obsm or 'X_scVI' not in new.obsm:
+            raise ValueError("X_scVI embeddings not found in the provided files. Set skip_preprocessing=False to generate them.")
+    else:
+        # Original preprocessing code
+        print(f"Loading and preprocessing {file1} and {file2}")
+        adata, new = load_and_preprocess_for_scvi(file1, file2)
+
     
     # Step 2: Compute UMAP embeddings for both datasets
     # For reference data
@@ -47,21 +50,6 @@ def plot_scvi_umap(file1,file2 , output_pdf=None):
     umap_accuracy = accuracy_score(knn_umap.predict(new.obsm["umap"]), new.obs["labels"].values.astype(str))
     print(f"KNN accuracy using UMAP embeddings: {umap_accuracy:.4f}")
 
-    # Step 5: Visualization with the same plotting approach, but using UMAP coordinates
-
-    # Get color mapping function
-    # def get_colors_for(adata):
-    #     """Get pretty colors for each class."""
-    #     colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
-    #             "#7f7f7f",  # This is the grey one
-    #             "#e377c2", "#bcbd22", "#17becf",
-    #             "#0000A6", "#63FFAC", "#004D43", "#8FB0FF"]
-
-    #     colors = dict(zip(adata.obs["labels"].value_counts().sort_values(ascending=False).index, colors))
-    #     colors["Other"] = "#7f7f7f"
-    #     assert all(l in colors for l in adata.obs["labels"].unique())
-    #     return colors
-
     colors = utils.get_colors_for(adata)
     cell_order = list(colors.keys())
     num_cell_types = len(np.unique(adata.obs["labels"]))
@@ -74,7 +62,9 @@ def plot_scvi_umap(file1,file2 , output_pdf=None):
             colors=colors, s=3, label_order=cell_order,
             legend_kwargs=dict(loc="upper center", bbox_to_anchor=(0.5, 0.05), 
                                 bbox_transform=fig.transFigure, labelspacing=1, 
-                                ncol=num_cell_types // 2 + 1))
+                                ncol=num_cell_types // 2 + 1),
+                                knn_scvi_accuracy=scvi_accuracy,  # Pass the accuracies
+                                knn_umap_accuracy=umap_accuracy)
 
     # Plot transformed samples
     colors_bw = {1: "#666666"}
@@ -99,9 +89,14 @@ def plot_scvi_umap(file1,file2 , output_pdf=None):
     # Add subplot labels
     for ax_, letter in zip(ax, string.ascii_lowercase): 
         plt.text(0, 1.02, letter, transform=ax_.transAxes, fontsize=15, fontweight="bold")
+        
+    # Add KNN accuracy text to the figure
+    fig.text(0.5, 0.02, f"KNN(scVI): {scvi_accuracy:.4f}    |    KNN(UMAP): {umap_accuracy:.4f}", 
+             ha='center', fontsize=12)
+
 
     # Save figure
-    plt.savefig("transform_pancreas_scvi_umap.pdf", dpi=600, bbox_inches="tight", transparent=True)
+    # plt.savefig("transform_pancreas_scvi_umap.pdf", dpi=600, bbox_inches="tight", transparent=True)
 
     # # Optional: If you want to compare with original t-SNE results
     # compare_fig, compare_ax = plt.subplots(figsize=(10, 5))
@@ -117,13 +112,13 @@ def plot_scvi_umap(file1,file2 , output_pdf=None):
         file1_name = os.path.splitext(os.path.basename(file1))[0]
         file2_name = os.path.splitext(os.path.basename(file2))[0]
         # Create the output file name
-        output_pdf = f"tsne_plot_scVI_KL_JS_concatenated{file1_name}_{file2_name}.pdf"
+        output_pdf = f"umap_plot_scVI_Knn_concatenated{file1_name}_{file2_name}.pdf"
     
     plt.savefig(output_pdf, dpi=600, bbox_inches="tight", transparent=True)
 
 if __name__ == "__main__":
-    # tsne_side_by_side_with_metrics(
-    #     "extracted_csv/GSM2230757_human1_umifm_counts_human.h5ad",
-    #     "extracted_csv/GSM2230758_human2_umifm_counts_human.h5ad"
-    # )
-    plot_scvi_umap("Datasets/baron_2016h.h5ad", "Datasets/xin_2016.h5ad")
+    
+    # plot_scvi_umap("Datasets/baron_2016h.h5ad", "Datasets/xin_2016.h5ad")
+    
+    # plot_scvi_umap("Datasets/baron_2016h_scvi.h5ad", "Datasets/xin_2016_scvi.h5ad", skip_preprocessing=True)
+    plot_scvi_umap("Datasets/hrvatin_2018_scvi.h5ad", "Datasets/chen_2017_scvi.h5ad",skip_preprocessing=True)

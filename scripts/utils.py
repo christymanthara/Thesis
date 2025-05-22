@@ -198,6 +198,8 @@ def plot(
     save_path=None,
     kl_divergence=None,         # ✅ New
     js_divergence=None,         # ✅ New
+    knn_scvi_accuracy=None,     # ✅ New for KNN accuracies
+    knn_umap_accuracy=None,     # ✅ New for KNN accuracies
     save_as_svg=False,
 
     **kwargs
@@ -282,6 +284,11 @@ def plot(
     if kl_divergence is not None and js_divergence is not None:
         add_divergence_text(fig, kl_divergence, js_divergence, fontsize=kwargs.get("fontsize", 12))
 
+       # ✅ Add KNN accuracy metrics (new functionality)
+    if knn_scvi_accuracy is not None and knn_umap_accuracy is not None:
+        add_knn_accuracy_text(fig, knn_scvi_accuracy, knn_umap_accuracy, fontsize=kwargs.get("fontsize", 12))
+
+
     if save_path is not None and fig is not None:
         # Always save as PDF
         pdf_path = save_path if save_path.endswith(".pdf") else save_path + ".pdf"
@@ -321,4 +328,10 @@ def add_divergence_text(fig, kl, js, fontsize=12):
     """Adds KL and JS divergence values as a caption to the figure."""
     if fig is not None:
         fig.text(0.5, 0.02, f"KL Divergence = {kl:.4f}    |    JS Divergence = {js:.4f}", 
+                 ha='center', fontsize=fontsize)
+
+def add_knn_accuracy_text(fig, knn_scvi, knn_umap, fontsize=12):
+    """Adds KNN accuracy values as a caption to the figure."""
+    if fig is not None:
+        fig.text(0.5, 0.02, f"KNN(scVI): {knn_scvi:.4f}    |    KNN(UMAP): {knn_umap:.4f}", 
                  ha='center', fontsize=fontsize)
