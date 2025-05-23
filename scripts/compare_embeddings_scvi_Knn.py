@@ -39,6 +39,9 @@ def plot_scvi_umap(file1,file2 , output_pdf=None, skip_preprocessing=False):
 
     # Step 3: Run KNN classification using scVI embeddings
     # Using scVI latent representations
+    
+    # you cannot use the metric cosine for umap
+    
     knn_scvi = KNeighborsClassifier()
     knn_scvi.fit(adata.obsm["X_scVI"], adata.obs["labels"].values.astype(str))
     scvi_accuracy = accuracy_score(knn_scvi.predict(new.obsm["X_scVI"]), new.obs["labels"].values.astype(str))
@@ -61,11 +64,12 @@ def plot_scvi_umap(file1,file2 , output_pdf=None, skip_preprocessing=False):
     file1_name = os.path.splitext(os.path.basename(file1))[0]
     file2_name = os.path.splitext(os.path.basename(file2))[0]
     
-    # Get the obs columns (typically includes 'labels' and other metadata)
-    obs_columns = list(adata.obs.columns)
-    obs_str = ','.join(obs_columns)
+    # Get the obsm keys (embeddings like 'X_scVI', 'umap', etc.)
+    obsm_keys = list(adata.obsm.keys())
+    obsm_str = ','.join(obsm_keys)
     
-    fig.suptitle(f"{file1_name}_{file2_name}_obs[{obs_str}]", fontsize=14, y=0.95)
+    fig.suptitle(f"{file1_name}_{file2_name}_obsm[{obsm_str}]", fontsize=14, y=0.95)
+
 
     # Plot reference embedding
     utils.plot(adata.obsm["umap"], adata.obs["labels"], ax=ax[0], title="Reference embedding (UMAP from scVI)", 
@@ -102,24 +106,9 @@ def plot_scvi_umap(file1,file2 , output_pdf=None, skip_preprocessing=False):
         
     # Add KNN accuracy text to the figure
     fig.text(0.5, 0.10, f"KNN(scVI): {scvi_accuracy:.4f}    |    KNN(UMAP): {umap_accuracy:.4f}", 
-             ha='center', fontsize=12)
+            ha='center', fontsize=12)
     
-    #  # Adjust layout to prevent overlap
-    # plt.tight_layout()
-    # plt.subplots_adjust(bottom=0.25)  # Make room for KNN text and legend
 
-
-    # Save figure
-    # plt.savefig("transform_pancreas_scvi_umap.pdf", dpi=600, bbox_inches="tight", transparent=True)
-
-    # # Optional: If you want to compare with original t-SNE results
-    # compare_fig, compare_ax = plt.subplots(figsize=(10, 5))
-    # compare_ax.bar(['t-SNE', 'scVI', 'UMAP from scVI'], 
-    #             [accuracy_score(knn.predict(new.obsm["tsne"]), new.obs["labels"].values.astype(str)), 
-    #             scvi_accuracy, umap_accuracy])
-    # compare_ax.set_title('KNN Classification Accuracy Comparison')
-    # compare_ax.set_ylim(0, 1)
-    
     # Generate default output_pdf name if not provided
     if output_pdf is None:
         # Extract file names without extensions
@@ -134,5 +123,5 @@ if __name__ == "__main__":
     
     # plot_scvi_umap("Datasets/baron_2016h.h5ad", "Datasets/xin_2016.h5ad")
     
-    # plot_scvi_umap("Datasets/baron_2016h_scvi.h5ad", "Datasets/xin_2016_scvi.h5ad", skip_preprocessing=True)
-    plot_scvi_umap("Datasets/hrvatin_2018_scvi.h5ad", "Datasets/chen_2017_scvi.h5ad", skip_preprocessing=True)
+    plot_scvi_umap("Datasets/baron_2016h_scvi.h5ad", "Datasets/xin_2016_scvi.h5ad", skip_preprocessing=True)
+    # plot_scvi_umap("Datasets/hrvatin_2018_scvi.h5ad", "Datasets/chen_2017_scvi.h5ad", skip_preprocessing=True)
