@@ -201,6 +201,8 @@ def plot(
     knn_scvi_accuracy=None,     # ✅ New for KNN accuracies
     knn_umap_accuracy=None,     # ✅ New for KNN accuracies
     save_as_svg=False,
+    knn_scGPT_accuracy=None,
+    knn_uce_accuracy=None,
 
     **kwargs
 ):
@@ -286,7 +288,13 @@ def plot(
 
        # ✅ Add KNN accuracy metrics (new functionality)
     if knn_scvi_accuracy is not None and knn_umap_accuracy is not None:
-        add_knn_accuracy_text(fig, knn_scvi_accuracy, knn_umap_accuracy, fontsize=kwargs.get("fontsize", 12))
+        add_knn_accuracy_scvi_text(fig, knn_scvi_accuracy, knn_umap_accuracy, fontsize=kwargs.get("fontsize", 12))
+
+    if knn_scGPT_accuracy is not None and knn_umap_accuracy is not None:
+        add_knn_accuracy_scgpt_text(fig, knn_scGPT_accuracy, knn_umap_accuracy, fontsize=kwargs.get("fontsize", 12))
+    
+    if knn_uce_accuracy is not None and knn_umap_accuracy is not None:
+        add_knn_accuracy_uce_text(fig, knn_uce_accuracy, knn_umap_accuracy, fontsize=kwargs.get("fontsize", 12))
 
 
     if save_path is not None and fig is not None:
@@ -330,8 +338,20 @@ def add_divergence_text(fig, kl, js, fontsize=12):
         fig.text(0.5, 0.02, f"KL Divergence = {kl:.4f}    |    JS Divergence = {js:.4f}", 
                  ha='center', fontsize=fontsize)
 
-def add_knn_accuracy_text(fig, knn_scvi, knn_umap, fontsize=12):
+def add_knn_accuracy_scvi_text(fig, knn_scvi, knn_umap, fontsize=12):
     """Adds KNN accuracy values as a caption to the figure."""
     if fig is not None:
         fig.text(0.5, 0.02, f"KNN(scVI): {knn_scvi:.4f}    |    KNN(UMAP): {knn_umap:.4f}", 
+                 ha='center', fontsize=fontsize)
+        
+def add_knn_accuracy_scgpt_text(fig, knn_scGpt, knn_umap, fontsize=12):
+    """Adds KNN accuracy values as a caption to the figure."""
+    if fig is not None:
+        fig.text(0.5, 0.02, f"KNN(scGPT): {knn_scGpt:.4f}    |    KNN(UMAP): {knn_umap:.4f}", 
+                 ha='center', fontsize=fontsize)
+
+def add_knn_accuracy_uce_text(fig, knn_uce, knn_umap, fontsize=12):
+    """Adds KNN accuracy values as a caption to the figure."""
+    if fig is not None:
+        fig.text(0.5, 0.02, f"KNN(UCE): {knn_uce:.4f}    |    KNN(UMAP): {knn_umap:.4f}", 
                  ha='center', fontsize=fontsize)
