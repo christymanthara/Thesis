@@ -3,15 +3,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import string
 from sklearn.neighbors import KNeighborsClassifier
-from data_utils.scvi_embedding import load_and_preprocess_for_scvi
+from data_utils.scanvi_embedding import load_and_preprocess_for_scanvi
 from sklearn.metrics import accuracy_score
 from umap import UMAP
-import scvi
+# import scvi
 import utils
 import os
 
-def plot_scvi_umap(file1,file2 , output_pdf=None, skip_preprocessing=False):
-    # Step 1: Set up scVI model for reference data
+def plot_scanvi_umap(file1,file2 , output_pdf=None, skip_preprocessing=False):
+    # Step 1: Set up scanvi model for reference data
     if skip_preprocessing:
         # Load data directly without preprocessing
         print(f"Loading {file1} directly (skipping preprocessing)")
@@ -20,34 +20,34 @@ def plot_scvi_umap(file1,file2 , output_pdf=None, skip_preprocessing=False):
         print(f"Loading {file2} directly (skipping preprocessing)")
         new = anndata.read_h5ad(file2)
         
-        # Check if X_scVI embeddings exist
-        if 'X_scVI' not in adata.obsm or 'X_scVI' not in new.obsm:
-            raise ValueError("X_scVI embeddings not found in the provided files. Set skip_preprocessing=False to generate them.")
+        # Check if X_scANVI embeddings exist
+        if 'X_scANVI' not in adata.obsm or 'X_scANVI' not in new.obsm:
+            raise ValueError("X_scANVI embeddings not found in the provided files. Set skip_preprocessing=False to generate them.")
     else:
         # Original preprocessing code
         print(f"Loading and preprocessing {file1} and {file2}")
-        adata, new = load_and_preprocess_for_scvi(file1, file2)
+        adata, new = load_and_preprocess_for_scanvi(file1, file2)
 
     
     # Step 2: Compute UMAP embeddings for both datasets
     # For reference data
     umap_model = UMAP(n_components=2)
-    adata.obsm["umap"] = umap_model.fit_transform(adata.obsm["X_scVI"])
+    adata.obsm["umap"] = umap_model.fit_transform(adata.obsm["X_scANVI"])
 
     # For new data, use the same UMAP model to ensure consistent embedding
-    new.obsm["umap"] = umap_model.transform(new.obsm["X_scVI"])
+    new.obsm["umap"] = umap_model.transform(new.obsm["X_scANVI"])
 
-    # Step 3: Run KNN classification using scVI embeddings
+    # Step 3: Run KNN classification using scanvi embeddings
     # Using scVI latent representations
     
     # you cannot use the metric cosine for umap
     
-    knn_scvi = KNeighborsClassifier()
-    knn_scvi.fit(adata.obsm["X_scVI"], adata.obs["labels"].values.astype(str))
-    scvi_accuracy = accuracy_score(knn_scvi.predict(new.obsm["X_scVI"]), new.obs["labels"].values.astype(str))
-    print(f"KNN accuracy using scVI embeddings: {scvi_accuracy:.4f}")
+    knn_scanvi = KNeighborsClassifier()
+    knn_scanvi.fit(adata.obsm["X_scANVI"], adata.obs["labels"].values.astype(str))
+    scanvi_accuracy = accuracy_score(knn_scanvi.predict(new.obsm["X_scANVI"]), new.obs["labels"].values.astype(str))
+    print(f"KNN accuracy using scanvi embeddings: {scanvi_accuracy:.4f}")
 
-    # Using UMAP embeddings derived from scVI
+    # Using UMAP embeddings derived from scanvi
     knn_umap = KNeighborsClassifier()
     knn_umap.fit(adata.obsm["umap"], adata.obs["labels"].values.astype(str))
     umap_accuracy = accuracy_score(knn_umap.predict(new.obsm["umap"]), new.obs["labels"].values.astype(str))
@@ -64,7 +64,7 @@ def plot_scvi_umap(file1,file2 , output_pdf=None, skip_preprocessing=False):
     file1_name = os.path.splitext(os.path.basename(file1))[0]
     file2_name = os.path.splitext(os.path.basename(file2))[0]
     
-    # Get the obsm keys (embeddings like 'X_scVI', 'umap', etc.)
+    # Get the obsm keys (embeddings like 'X_scANVI', 'umap', etc.)
     obsm_keys = list(adata.obsm.keys())
     obsm_str = ','.join(obsm_keys)
     
@@ -72,12 +72,12 @@ def plot_scvi_umap(file1,file2 , output_pdf=None, skip_preprocessing=False):
 
 
     # Plot reference embedding
-    utils.plot(adata.obsm["umap"], adata.obs["labels"], ax=ax[0], title="Reference embedding (UMAP from scVI)", 
+    utils.plot(adata.obsm["umap"], adata.obs["labels"], ax=ax[0], title="Reference embedding (UMAP from scanvi)", 
             colors=colors, s=3, label_order=cell_order,
             legend_kwargs=dict(loc="upper center", bbox_to_anchor=(0.5, 0.05), 
                                 bbox_transform=fig.transFigure, labelspacing=1, 
                                 ncol=num_cell_types // 2 + 1),
-                                knn_scvi_accuracy=scvi_accuracy,  # Pass the accuracies
+                                knn_scanvi_accuracy=scanvi_accuracy,  # Pass the accuracies
                                 knn_umap_accuracy=umap_accuracy)
 
     # Plot transformed samples
@@ -105,7 +105,7 @@ def plot_scvi_umap(file1,file2 , output_pdf=None, skip_preprocessing=False):
         plt.text(0, 1.02, letter, transform=ax_.transAxes, fontsize=15, fontweight="bold")
         
     # Add KNN accuracy text to the figure
-    fig.text(0.5, 0.10, f"KNN(scVI): {scvi_accuracy:.4f}    |    KNN(UMAP): {umap_accuracy:.4f}", 
+    fig.text(0.5, 0.10, f"KNN(scanvi): {scanvi_accuracy:.4f}    |    KNN(UMAP): {umap_accuracy:.4f}", 
             ha='center', fontsize=12)
     
 
@@ -115,13 +115,13 @@ def plot_scvi_umap(file1,file2 , output_pdf=None, skip_preprocessing=False):
         file1_name = os.path.splitext(os.path.basename(file1))[0]
         file2_name = os.path.splitext(os.path.basename(file2))[0]
         # Create the output file name
-        output_pdf = f"umap_plot_scVI_Knn_concatenated{file1_name}_{file2_name}.pdf"
+        output_pdf = f"umap_plot_scanVI_Knn_concatenated{file1_name}_{file2_name}.pdf"
     
     plt.savefig(output_pdf, dpi=600, bbox_inches="tight", transparent=True)
 
 if __name__ == "__main__":
     
-    # plot_scvi_umap("Datasets/baron_2016h.h5ad", "Datasets/xin_2016.h5ad")
+    plot_scanvi_umap("Datasets/baron_2016h.h5ad", "Datasets/xin_2016.h5ad")
     
-    plot_scvi_umap("Datasets/baron_2016h_scvi.h5ad", "Datasets/xin_2016_scvi.h5ad", skip_preprocessing=True)
-    # plot_scvi_umap("Datasets/hrvatin_2018_scvi.h5ad", "Datasets/chen_2017_scvi.h5ad", skip_preprocessing=True)
+    # plot_scanvi_umap("Datasets/baron_2016h_scanvi.h5ad", "Datasets/xin_2016_scanvi.h5ad", skip_preprocessing=True)
+    # plot_scanvi_umap("Datasets/hrvatin_2018_scanvi.h5ad", "Datasets/chen_2017_scanvi.h5ad", skip_preprocessing=True)
