@@ -8,8 +8,11 @@ import scvi.model as scvimodel
 import os
 from plottable import Table
 import pandas as pd
+import multiprocessing
+num_workers = multiprocessing.cpu_count()
 
 # %matplotlib inline
+
 
 def benchmark_scib(adata_path):
     """
@@ -28,7 +31,8 @@ def benchmark_scib(adata_path):
     print("Min value:", adata.X.min())
 
     # Ensure counts are integers
-    adata.X = adata.X.astype(int)
+    # adata.X = adata.X.astype(int)
+    adata.X = adata.X.astype(np.float32)
 
     # Store a copy of the raw counts
     adata.raw = adata.copy()
@@ -48,8 +52,11 @@ def benchmark_scib(adata_path):
         print("adata.layers['counts'] exists and has shape:", adata.layers["counts"].shape)
     else:
         print("'counts' not found in adata.layers")
-    print(adata.obsm["X_scGPT"].shape)
-    print(np.isnan(adata.obsm["X_scGPT"]).sum())
+    # print(adata.obsm["X_scGPT"].shape)
+    # print(np.isnan(adata.obsm["X_scGPT"]).sum())
+    print(adata.obsm["X_uce"].shape)
+    print(np.isnan(adata.obsm["X_uce"]).sum())
+
     print("Avalable layers are: ", adata.layers.keys())
 
 
@@ -61,12 +68,14 @@ def benchmark_scib(adata_path):
     if adata.raw is not None:
         print(adata.raw.X[:5, :5])
 
-    adata.obs["cell_type"] = adata.obs["labels"]
+    # adata.obs["cell_type"] = adata.obs["labels"] #use for the datasets like baron xin
+    adata.obs["cell_type"] = adata.obs["cell_type"]
     print(adata.obs["cell_type"].value_counts())
 
     #computing the scvi metrics
     # scvimodel.SCVI.setup_anndata(adata, layer="counts", batch_key="batch_id")
-    scvimodel.SCVI.setup_anndata(adata, batch_key="batch_id")
+    # scvimodel.SCVI.setup_anndata(adata, batch_key="batch_id")
+    scvimodel.SCVI.setup_anndata(adata, batch_key="source")
     vae = scvimodel.SCVI(adata, gene_likelihood="nb", n_layers=2, n_latent=30)
     vae.train()
     adata.obsm["scVI"] = vae.get_latent_representation()
@@ -81,33 +90,40 @@ def benchmark_scib(adata_path):
     )
     lvae.train(max_epochs=20, n_samples_per_label=100)
     adata.obsm["scANVI"] = lvae.get_latent_representation()
-    
+
     #saving the adata object
     adata.write_h5ad("test_scGPT_scanvi_scvi_benchmark.h5ad")
-    
 
-    sc.pp.highly_variable_genes(adata, n_top_genes=2000, flavor="cell_ranger", batch_key="batch_id")
+
+    # sc.pp.highly_variable_genes(adata, n_top_genes=2000, flavor="cell_ranger", batch_key="batch_id")
+    sc.pp.highly_variable_genes(adata, n_top_genes=2000, flavor="cell_ranger", batch_key="source")
     sc.tl.pca(adata, n_comps=30, use_highly_variable=True)
     adata.obsm["Unintegrated"] = adata.obsm["X_pca"]
-    print(adata.obs["batch_id"].value_counts())
+    # print(adata.obs["batch_id"].value_counts())
+    print(adata.obs["source"].value_counts())
     # print(adata.obs["cell_type"].value_counts())
     print(adata.obs.columns)
-    adata.obs["cell_type"] = adata.obs["labels"]
+    # adata.obs["cell_type"] = adata.obs["labels"] #use for the datasets like baron xin
+    adata.obs["cell_type"] = adata.obs["cell_type"]
     print(adata.obs["cell_type"].value_counts())
 
-    embedding_keys = ["Unintegrated", "scVI", "scANVI", "X_scGPT"]
+    # embedding_keys = ["Unintegrated", "scVI", "scANVI", "X_scGPT"]
+    embedding_keys = ["Unintegrated", "scVI", "scANVI", "X_uce"]
     bm = Benchmarker(
         adata,
-        batch_key="batch_id",
-        label_key="labels",
+        # batch_key="batch_id",
+        batch_key="source",
+        # label_key="labels",
+        label_key="cell_type",
         bio_conservation_metrics=BioConservation(
             # Use a subset of metrics that are less memory-intensive
-            ["nmi_cluster_labels", "graph_connectivity"],
+            silhouette_label=False,clisi_knn=True
             # Skip silhouette which is causing the memory error
-            
         ),
         batch_correction_metrics=BatchCorrection(),
-        embedding_obsm_keys=["X_scGPT"],
+        # embedding_obsm_keys=["X_scGPT"],
+        # embedding_obsm_keys=["X_uce"],
+        embedding_obsm_keys=embedding_keys,
         n_jobs=6,
     )
     bm.benchmark()
@@ -148,11 +164,15 @@ def benchmark_scib(adata_path):
 
 if __name__ == "__main__":
     # Load your AnnData object
-    adata = sc.read("/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_baron_2016h_xin_2016.h5ad")
+    # adata = sc.read("/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_baron_2016h_xin_2016.h5ad")
 
     # Run the benchmark
     # benchmark_scib(adata)
     # benchmark_scib("/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_baron_2016h_xin_2016.h5ad")
     # benchmark_scib("/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_chen_2017_hrvatin_2018.h5ad")
-    benchmark_scib("/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_macosko_2015_shekhar_2016.h5ad")
+    # benchmark_scib("/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_macosko_2015_shekhar_2016.h5ad")
     # benchmark_scib("/home/thechristyjo/Documents/Thesis/test_scGPT_scanvi_scvi_benchmark.h5ad")
+    
+    # when checking with the uce datasets
+    # benchmark_scib("F:/Thesis/adata_concat_uce_baron_2016h_uce_adata_xin_2016_uce_adata.h5ad")
+    benchmark_scib("F:/Thesis/adata_concat_UCE_sample_proc_lung_train_uce_adata_sample_proc_lung_test_uce_adata.h5ad")
