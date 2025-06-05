@@ -13,6 +13,7 @@ This script performs benchmarking of single-cell embeddings by:
 import argparse
 import sys
 import os
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import scanpy as sc
@@ -342,13 +343,25 @@ def run_benchmarking(adata_file, label_key="labels", batch_key="batch_id",
             print("Error: No valid embedding keys found!")
             return None, None
     
-    print(f"Running {n_samples} subsampled benchmarks with {sample_size} cells each...")
+    # Check if sample size is larger than available data
+    total_cells = adata.n_obs
+    if sample_size > total_cells:
+        print(f"Warning: Requested sample size ({sample_size:,}) is larger than available cells ({total_cells:,})")
+        print(f"Adjusting sample size to {total_cells:,} cells (using all available data)")
+        sample_size = total_cells
+    
+    print(f"Running {n_samples} subsampled benchmarks with {sample_size:,} cells each...")
     
     sample_score_dfs = []
     
     for i in tqdm(range(n_samples), desc="Running benchmarks"):
         # Create subsample with random state i
-        subsample_adata = sc.pp.subsample(adata, copy=True, n_obs=sample_size, random_state=i)
+        if sample_size < total_cells:
+            # Only subsample if we have more cells than requested
+            subsample_adata = sc.pp.subsample(adata, copy=True, n_obs=sample_size, random_state=i)
+        else:
+            # Use all data if sample_size >= total_cells
+            subsample_adata = adata.copy()
         
         # Run benchmark on this sample
         sample_df = benchmark_single_sample(
@@ -379,9 +392,15 @@ def run_benchmarking(adata_file, label_key="labels", batch_key="batch_id",
         print(f"\nBio conservation scores (mean):")
         print(grouped_mean["Bio conservation"])
     
-    # Save results if output file specified
+    # Save results if output file specified, or generate default timestamped outputs
     if output_file:
         print(f"\nSaving results to {output_file}")
+        
+        # Create output directory if it doesn't exist
+        output_dir = os.path.dirname(output_file)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            print(f"Created output directory: {output_dir}")
         
         # Determine output format based on file extension
         file_ext = os.path.splitext(output_file)[1].lower()
@@ -400,9 +419,36 @@ def run_benchmarking(adata_file, label_key="labels", batch_key="batch_id",
         else:
             # Default to CSV if extension not recognized
             base_name = os.path.splitext(output_file)[0]
+            # Ensure directory exists for CSV files too
+            csv_dir = os.path.dirname(base_name)
+            if csv_dir and not os.path.exists(csv_dir):
+                os.makedirs(csv_dir)
             grouped_mean.to_csv(f"{base_name}_mean_scores.csv")
             grouped_std.to_csv(f"{base_name}_std_scores.csv")
             print("CSV results saved successfully!")
+    
+    else:
+        # Generate default timestamped outputs when no --output flag is provided
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_filename = f"benchmark_results_{timestamp}"
+        
+        print(f"\nNo output file specified. Generating default timestamped outputs...")
+        print(f"Base filename: {base_filename}")
+        
+        # Save CSV files
+        csv_mean_file = f"{base_filename}_mean_scores.csv"
+        csv_std_file = f"{base_filename}_std_scores.csv"
+        grouped_mean.to_csv(csv_mean_file)
+        grouped_std.to_csv(csv_std_file)
+        print(f"CSV files saved: {csv_mean_file}, {csv_std_file}")
+        
+        # Save PDF file
+        pdf_file = f"{base_filename}.pdf"
+        save_results_pdf(grouped_mean, grouped_std, pdf_file, adata_file,
+                        label_key, batch_key, obsm_keys, sample_size, n_samples)
+        print(f"PDF file saved: {pdf_file}")
+        
+        print("Default timestamped results saved successfully!")
     
     return grouped_mean, grouped_std
 
@@ -428,7 +474,8 @@ Examples:
     parser.add_argument("--batch-key", default="batch_id",
                        help="Key in adata.obs for batch information (default: batch_id)")
     parser.add_argument("--obsm-keys", nargs="+", 
-                       default=["X_uce", "X_scANVI", "X_scVI"],)
+                       default=["X_uce", "X_scANVI", "X_scVI"],
+                       help="List of embedding keys in adata.obsm to benchmark")
     parser.add_argument("--sample-size", type=int, default=100000,
                        help="Number of cells to sample for each benchmark run (default: 100000)")
     parser.add_argument("--n-samples", type=int, default=10,
