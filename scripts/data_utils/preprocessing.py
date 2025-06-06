@@ -1,3 +1,11 @@
+import anndata
+import scanpy as sc
+import os
+import pandas as pd  # Ensure pandas handles string assignments correctly
+from sklearn import decomposition
+import scipy
+import numpy as np
+
 def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_basename=True, save=False):
     """
     Loads two AnnData files, assigns source labels, filters matching cells based on a given column,
@@ -154,3 +162,11 @@ def prepare_for_traditional_ml(adata):
     adata_ml = adata.copy()
     adata_ml.X = adata.layers['standardized'].copy()
     return adata_ml
+
+
+if __name__ == "__main__":
+    combined_data = load_and_preprocess_multi_embedder(
+    file1="Datasets/baron_2016h.h5ad", 
+    file2="Datasets/xin_2016.h5ad",
+    save=True  # This will save all processed files
+)
