@@ -95,8 +95,18 @@ def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_
     if scipy.sparse.issparse(adata_std.X):
         adata_std.X = adata_std.X.toarray()
     
-    adata_std.X -= adata_std.X.mean(axis=0)
-    adata_std.X /= adata_std.X.std(axis=0)
+    # Standardize with NaN handling
+    means = adata_std.X.mean(axis=0)
+    stds = adata_std.X.std(axis=0)
+    
+    # Handle genes with zero variance (std=0) to avoid NaN
+    stds[stds == 0] = 1.0  # Set std=1 for constant genes (no scaling effect)
+    
+    adata_std.X -= means
+    adata_std.X /= stds
+    
+    # Additional safety check: replace any remaining NaN with 0
+    adata_std.X = np.nan_to_num(adata_std.X, nan=0.0, posinf=0.0, neginf=0.0)
     
     # Store standardized data in layers
     full.layers['standardized'] = adata_std.X.copy()
@@ -174,10 +184,10 @@ def prepare_for_traditional_ml(adata):
     adata_ml.X = adata.layers['standardized'].copy()
     return adata_ml
 
-
 if __name__ == "__main__":
     combined_data = load_and_preprocess_multi_embedder(
-    file1="Datasets/baron_2016h.h5ad", 
-    file2="Datasets/xin_2016.h5ad",
-    save=True  # This will save all processed files
+    file1="../Datasets/baron_2016h.h5ad", 
+    file2="../Datasets/xin_2016.h5ad",
+    save=True,          # Saves all files
+    split_output=True   # Returns individual datasets
 )
