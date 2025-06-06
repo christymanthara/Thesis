@@ -72,7 +72,7 @@ def compute_embeddings_scvi_scanvi_uce(
         output_filename = f"{base_name}_X_scvi_X_scanvi_X_scGPT_test{ext}"
         
     else:
-        output_filename = "adata_with_embeddings_X_scvi_X_scanvi_X_scGPT.h5ad"
+        output_filename = "adata_with_embeddings_X_scvi_X_scanvi_X_uce.h5ad"
     
     # Save the final file with all embeddings
     adata_obj.write(output_filename)
@@ -84,4 +84,4 @@ def compute_embeddings_scvi_scanvi_uce(
 if __name__ == "__main__":
     # compute_embeddings_scvi_scanvi_scgpt("adata_concat_scGPT_baron_2016h_xin_2016.h5ad")
     # compute_embeddings_scvi_scanvi_scgpt("adata_concat_scGPT_baron_2016h_xin_2016_X_scvi_X_scanvi_X_scGPT.h5ad")
-    compute_embeddings_scvi_scanvi_uce("F:/Thesis/baron_2016hxin_2016_uce_adata.h5ad")
+    compute_embeddings_scvi_scanvi_uce("F:/Thesis/chen_2017hrvatin_2018_uce_adata.h5ad")
