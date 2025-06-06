@@ -6,7 +6,7 @@ from sklearn import decomposition
 import scipy
 import numpy as np
 
-def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_basename=True, save=False):
+def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_basename=True, save=False, split_output=False):
     """
     Loads two AnnData files, assigns source labels, filters matching cells based on a given column,
     concatenates them, filters genes, and prepares data for multiple embedding methods.
@@ -23,14 +23,20 @@ def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_
         If True, saves the processed files:
         - Combined: filename1_filename2_preprocessed.h5ad
         - Split: filename1_preprocessed.h5ad, filename2_preprocessed.h5ad
+    split_output : bool
+        If True, returns (adata1, adata2) tuple instead of combined dataset
     
     Returns:
     --------
-    AnnData with:
-    - .X: Raw counts (for scVI/scANVI)
-    - .layers['normalized']: Log-normalized data (for scGPT, UCE)
-    - .layers['standardized']: Standardized data (for traditional methods)
-    - .obsm['X_pca']: PCA embeddings (50 components)
+    If split_output=False (default):
+        AnnData with:
+        - .X: Raw counts (for scVI/scANVI)
+        - .layers['normalized']: Log-normalized data (for scGPT, UCE)
+        - .layers['standardized']: Standardized data (for traditional methods)
+        - .obsm['X_pca']: PCA embeddings (50 components)
+    
+    If split_output=True:
+        Tuple of (adata1, adata2) - individual datasets with all processing layers
     """
     
     # Load the datasets
@@ -113,16 +119,21 @@ def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_
         full.write_h5ad(combined_filename)
         
         # Save split files
-        adata1, adata2 = split_by_source(full, source1_name, source2_name)
+        adata1_save, adata2_save = split_by_source(full, source1_name, source2_name)
         
         filename1 = f"{base1}_preprocessed.h5ad"
         filename2 = f"{base2}_preprocessed.h5ad"
         
         print(f"Saving split datasets to: {filename1}, {filename2}")
-        adata1.write_h5ad(filename1)
-        adata2.write_h5ad(filename2)
+        adata1_save.write_h5ad(filename1)
+        adata2_save.write_h5ad(filename2)
 
-    return full
+    # Return based on split_output flag
+    if split_output:
+        adata1, adata2 = split_by_source(full, source1_name, source2_name)
+        return adata1, adata2
+    else:
+        return full
 
 
 def split_by_source(adata, source1_name, source2_name):
