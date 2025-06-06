@@ -559,5 +559,8 @@ Examples:
 if __name__ == "__main__":
     main()
     
-    cross validated
+    # cross validated
     
+    
+    
+    # find 10 closest embedded neighbouyrs of B in A 
