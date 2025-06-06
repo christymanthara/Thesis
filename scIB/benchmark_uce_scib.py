@@ -64,6 +64,33 @@ def faiss_brute_force_nn(X: np.ndarray, k: int):
     return NeighborsResults(indices=indices, distances=np.sqrt(distances))
 
 
+def clean_numeric_data(df):
+    """
+    Clean dataframe to ensure all values are numeric and handle NaN/inf values.
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        Input dataframe to clean
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        Cleaned dataframe with numeric values only
+    """
+    # Convert all columns to numeric, coercing errors to NaN
+    for col in df.columns:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    # Replace infinite values with NaN
+    df = df.replace([np.inf, -np.inf], np.nan)
+    
+    # Fill NaN values with 0 (or you could use df.dropna() to remove rows with NaN)
+    df = df.fillna(0)
+    
+    return df
+
+
 def benchmark_single_sample(adata, label_key="labels", batch_key="batch_id", 
                            obsm_keys=["X_uce", "X_scANVI", "X_scVI"], n_jobs=48):
     """
@@ -271,21 +298,34 @@ Summary Statistics:
         pdf.savefig(fig, bbox_inches='tight')
         plt.close()
         
-        # Page 5: Heatmap of mean scores
+        # Page 5: Heatmap of mean scores (with error handling)
         if len(grouped_mean) > 1 and len(grouped_mean.columns) > 1:
-            fig, ax = plt.subplots(figsize=(10, 6))
-            
-            # Create heatmap
-            sns.heatmap(grouped_mean, annot=True, fmt='.3f', cmap='RdYlBu_r',
-                       center=grouped_mean.values.mean(), ax=ax, cbar_kws={'shrink': 0.8})
-            
-            ax.set_title('Heatmap of Mean Benchmark Scores', fontsize=14, fontweight='bold')
-            ax.set_xlabel('Metrics')
-            ax.set_ylabel('Embeddings')
-            
-            plt.tight_layout()
-            pdf.savefig(fig, bbox_inches='tight')
-            plt.close()
+            try:
+                # Clean the data before plotting
+                clean_mean_data = clean_numeric_data(grouped_mean.copy())
+                
+                # Check if we have valid numeric data after cleaning
+                if clean_mean_data.empty or clean_mean_data.isna().all().all():
+                    print("Warning: No valid numeric data for heatmap, skipping heatmap page")
+                else:
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    
+                    # Create heatmap with cleaned data
+                    sns.heatmap(clean_mean_data, annot=True, fmt='.3f', 
+                               cmap='RdYlBu_r', center=clean_mean_data.values.mean(), 
+                               ax=ax, cbar_kws={'shrink': 0.8})
+                    
+                    ax.set_title('Heatmap of Mean Benchmark Scores', fontsize=14, fontweight='bold')
+                    ax.set_xlabel('Metrics')
+                    ax.set_ylabel('Embeddings')
+                    
+                    plt.tight_layout()
+                    pdf.savefig(fig, bbox_inches='tight')
+                    plt.close()
+                    
+            except Exception as e:
+                print(f"Warning: Could not create heatmap due to error: {e}")
+                print("Skipping heatmap page and continuing with other visualizations")
 
 
 def run_benchmarking(adata_file, label_key="labels", batch_key="batch_id", 
@@ -382,8 +422,18 @@ def run_benchmarking(adata_file, label_key="labels", batch_key="batch_id",
     all_results = pd.concat([df.drop("Metric Type", errors='ignore').reset_index() 
                            for df in sample_score_dfs])
     
-    grouped_mean = all_results.groupby("Embedding").agg(np.mean)
-    grouped_std = all_results.groupby("Embedding").agg(np.std)
+    # Clean the data before computing statistics
+    numeric_columns = all_results.select_dtypes(include=[np.number]).columns
+    all_results_clean = all_results.copy()
+    for col in numeric_columns:
+        all_results_clean[col] = pd.to_numeric(all_results_clean[col], errors='coerce')
+    
+    grouped_mean = all_results_clean.groupby("Embedding").agg(np.mean, numeric_only=True)
+    grouped_std = all_results_clean.groupby("Embedding").agg(np.std, numeric_only=True)
+    
+    # Clean the final results
+    grouped_mean = clean_numeric_data(grouped_mean)
+    grouped_std = clean_numeric_data(grouped_std)
     
     print("\nMean benchmark scores:")
     print(grouped_mean)
@@ -508,3 +558,6 @@ Examples:
 
 if __name__ == "__main__":
     main()
+    
+    cross validated
+    
