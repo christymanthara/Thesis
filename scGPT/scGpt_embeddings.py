@@ -10,7 +10,7 @@ import sys
 import scgpt as scg
 import anndata
 import os
-from scripts.data_utils.processing import load_and_label_scGPT
+from processing import load_and_label_scGPT
 
 
 def embed_and_visualize(
@@ -212,16 +212,16 @@ def concat_and_embed(
 
 if __name__ == "__main__":
     # file1 = "temp/Datasets/lung/sample_proc_lung_test.h5ad"
-    # file1 = "/home/thechristyjo/Documents/Thesis/Datasets/baron_2016h.h5ad"
+    file1 = "/extras/data/Thesis/Datasets/baron_2016h.h5ad"
     # file1 = "/home/thechristyjo/Documents/Thesis/Datasets/chen_2017.h5ad"
-    file1 = "Datasets/macosko_2015.h5ad"
+    # file1 = "Datasets/macosko_2015.h5ad"
     # file1 = "/home/thechristyjo/Documents/Thesis/Datasets/sample_proc_lung_train.h5ad"
 
 
     # file2 = "temp/Datasets/lung/sample_proc_lung_train.h5ad"
-    # file2 = "/home/thechristyjo/Documents/Thesis/datasets/xin_2016.h5ad"
+    file2 = "/extras/data/Thesis/Datasets/xin_2016.h5ad"
     # file2 = "/home/thechristyjo/Documents/Thesis/Datasets/hrvatin_2018.h5ad"
-    file2 = "Datasets/shekhar_2016.h5ad"
+    # file2 = "Datasets/shekhar_2016.h5ad"
     # file2 = "/home/thechristyjo/Documents/Thesis/Datasets/sample_proc_lung_test.h5ad"
 
     adata = anndata.read_h5ad(file1)
@@ -230,7 +230,7 @@ if __name__ == "__main__":
     adata2 = anndata.read_h5ad(file2)
     adata2.var['gene_name'] = adata2.var.index
     
-    model_dir = "/home/thechristyjo/Documents/Thesis/scGPT/model"
+    model_dir = "/extras/data/Thesis/scGPT/model"
     
     # Extract short filenames without paths and extensions
     file1_name = os.path.splitext(os.path.basename(file1))[0]
