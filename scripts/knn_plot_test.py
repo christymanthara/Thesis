@@ -272,16 +272,23 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             # Add KNN accuracy text to the figure
             embedding_clean = embedding_key.replace('X_', '').replace('_', '')
             viz_label = "UMAP" if 'umap' in embedding_key.lower() else "t-SNE"
+            # fig.text(0.5, 0.10, 
+            #         f"Reference CV - {embedding_clean}: {reference_cv_accuracy:.3f}±{reference_cv_std:.3f}  |  "
+            #         # f"{viz_label}: {reference_tsne_cv_accuracy:.3f}±{reference_tsne_cv_std:.3f}\n"
+            #         f"Query Transfer - {embedding_clean}: {query_orig_accuracy:.3f}  |  "
+            #         # f"{viz_label}: {query_tsne_accuracy:.3f}", 
+            #         ha='center', fontsize=10)
+            
             fig.text(0.5, 0.10, 
-                    f"Reference CV - {embedding_clean}: {reference_cv_accuracy:.3f}±{reference_cv_std:.3f}  |  "
-                    f"{viz_label}: {reference_tsne_cv_accuracy:.3f}±{reference_tsne_cv_std:.3f}\n"
-                    f"Query Transfer - {embedding_clean}: {query_orig_accuracy:.3f}  |  "
-                    f"{viz_label}: {query_tsne_accuracy:.3f}", 
+                    f"Reference CV - {embedding_clean}: {reference_cv_accuracy:.3f}±{reference_cv_std:.3f}  | ",
+                    f"Query Transfer - {embedding_clean}: {query_orig_accuracy:.3f}  |  ",
+                    # f"{viz_label}: {query_tsne_accuracy:.3f}", 
                     ha='center', fontsize=10)
+            
             
             # Generate output filename
             embedding_name = embedding_key.replace('X_', '').lower()
-            output_pdf = f"tsne_plot_cross_validated_2_{base_filename}_{embedding_name}.pdf"
+            output_pdf = f"tsne_plot_cross_validated_final_{base_filename}_{embedding_name}.pdf"
             
             # Save plot
             plt.savefig(output_pdf, dpi=600, bbox_inches="tight", transparent=True)
@@ -363,7 +370,7 @@ def create_results_table(results_table, base_filename, reference_file=None):
                 style='italic', wrap=True)
 
     # Save table as PDF
-    table_output = f"knn_results_summary_{base_filename}.pdf"
+    table_output = f"knn_results_summary_final_{base_filename}.pdf"
     plt.savefig(table_output, dpi=300, bbox_inches="tight", 
                 facecolor='white', edgecolor='none')
     print(f"Saved results table as {table_output}")
