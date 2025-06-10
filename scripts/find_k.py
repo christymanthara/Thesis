@@ -77,13 +77,23 @@ def tune_knn_hyperparameters(
         if embedding_key is None:
             raise ValueError("`embedding_key` must be provided when using an AnnData object.")
 
+        # Check if required keys exist in adata
+        if 'source' not in adata.obs:
+            raise ValueError("Column 'source' not found in adata.obs.")
+        if labels_key not in adata.obs:
+            raise ValueError(f"Labels key '{labels_key}' not found in adata.obs.")
+        if embedding_key not in adata.obsm and embedding_key not in adata.layers:
+            raise ValueError(f"Embedding key '{embedding_key}' not found in adata.obsm or adata.layers.")
+        if ref_source_name not in adata.obs['source'].values:
+            raise ValueError(f"Reference source name '{ref_source_name}' not found in adata.obs['source'].")
+        if query_source_name not in adata.obs['source'].values:
+            raise ValueError(f"Query source name '{query_source_name}' not found in adata.obs['source'].")
+
         # Extract embedding data from .obsm or .layers
         if embedding_key in adata.obsm:
             embedding_data = adata.obsm[embedding_key]
         elif embedding_key in adata.layers:
             embedding_data = adata.layers[embedding_key]
-        else:
-            raise ValueError(f"Embedding key '{embedding_key}' not found in adata.obsm or adata.layers.")
 
         # Create masks for splitting data
         reference_mask = adata.obs["source"] == ref_source_name
@@ -171,7 +181,7 @@ def tune_knn_hyperparameters(
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if save_plots:
-            filename = os.path.join(output_dir, 'knn_hyperparameter_tuning_{embedding_key}.pdf')
+            filename = os.path.join(output_dir, f'knn_hyperparameter_tuning_{embedding_key}.pdf')
             plt.savefig(filename, format='pdf', dpi=300, bbox_inches='tight')
             plot_files.append(filename)
             print(f"\nHyperparameter tuning plot saved as: {filename}")
@@ -215,7 +225,7 @@ def tune_knn_hyperparameters(
 if __name__ == '__main__':
     # --- Example Usage ---
     
-    anndata_file = "baron_2016h_xin_2016_preprocessed_uce_adata_X_scvi_X_scanvi_X_uce_test.h5ad"
+    anndata_file = "/shared/home/christy.jo.manthara/batch-effect-analysis/output/baron_2016h_xin_2016_preprocessed_with_original_X_uce_adata_X_scvi_X_scanvi_X_uce_test.h5ad"
     # Load the AnnData object
     adata = anndata.read_h5ad(anndata_file)
 
