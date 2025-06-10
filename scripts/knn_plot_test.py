@@ -6,6 +6,7 @@
     from sklearn.metrics import accuracy_score
     import utils
     import os
+    from sklearn.model_selection import cross_val_score
 
     from compute_tsne_embeddings import compute_tsne_embedding
 
@@ -109,23 +110,68 @@
                 
                 reference_mask = ref_tsne.obs["source"] == "baron_2016h"
                 
-                # Fit KNN on the reference embeddings; we are using holdout validation here
-                print(f"Fitting KNN on reference embeddings for {embedding_key}...")
-                knn_orig.fit(ref_tsne.obsm[embedding_key][reference_mask], ref_tsne.obs["labels"][reference_mask].values.astype(str))
-                orig_accuracy = accuracy_score(knn_orig.predict(adata_tsne.obsm[embedding_key]), 
-                                            adata_tsne.obs["labels"].values.astype(str))
-                print(f"KNN accuracy using {embedding_key} embeddings: {orig_accuracy:.4f}")
+                # # Fit KNN on the reference embeddings; we are using holdout validation here
+                # print(f"Fitting KNN on reference embeddings for {embedding_key}...")
+                # knn_orig.fit(ref_tsne.obsm[embedding_key][reference_mask], ref_tsne.obs["labels"][reference_mask].values.astype(str))
+                # orig_accuracy = accuracy_score(knn_orig.predict(adata_tsne.obsm[embedding_key]), 
+                #                             adata_tsne.obs["labels"].values.astype(str))
+                # print(f"KNN accuracy using {embedding_key} embeddings: {orig_accuracy:.4f}")
+                
+                
+                #Cross validation to get a more robust estimate of accuracy
+                print(f"Cross-validating KNN on reference embeddings for {embedding_key}...")
+                # Extract reference data for cross-validation
+                reference_embeddings = ref_tsne.obsm[embedding_key][reference_mask]
+                reference_labels = ref_tsne.obs["labels"][reference_mask].values.astype(str)
+
+                # Cross-validation on reference data
+                print(f"Running cross-validation on reference data for {embedding_key}...")
+                cv_scores_orig = cross_val_score(knn_orig, reference_embeddings, reference_labels, cv=5)
+                reference_cv_accuracy = cv_scores_orig.mean()
+                reference_cv_std = cv_scores_orig.std()
+                print(f"Reference CV accuracy using {embedding_key}: {reference_cv_accuracy:.4f} ± {reference_cv_std:.4f}")
+
+                # Train final model on full reference data
+                knn_orig.fit(reference_embeddings, reference_labels)
+
+                # Evaluate only on query data
+                query_mask = adata_tsne.obs["source"] == "xin_2016"
+                query_embeddings = adata_tsne.obsm[embedding_key][query_mask]
+                query_labels = adata_tsne.obs["labels"][query_mask].values.astype(str)
+                query_orig_accuracy = accuracy_score(knn_orig.predict(query_embeddings), query_labels)
+                print(f"Query accuracy using {embedding_key}: {query_orig_accuracy:.4f}")
                 
                 # Run KNN classification using t-SNE embeddings
+                # print(f"Running KNN classification using {tsne_key} embeddings...")
+                # knn_tsne = KNeighborsClassifier(n_neighbors=10)
+                # knn_tsne.fit(ref_tsne.obsm[tsne_key][reference_mask], ref_tsne.obs["labels"][reference_mask].values.astype(str))
+                # tsne_accuracy = accuracy_score(knn_tsne.predict(adata_tsne.obsm[tsne_key]), 
+                #                             adata_tsne.obs["labels"].values.astype(str))
+                # print(f"KNN accuracy using {tsne_key} embeddings: {tsne_accuracy:.4f}")
+                
+                
+                #For cross-validation on t-SNE embeddings
+                print(f"Cross-validating KNN on t-SNE embeddings for {tsne_key}...")
                 print(f"Running KNN classification using {tsne_key} embeddings...")
                 knn_tsne = KNeighborsClassifier(n_neighbors=10)
-                knn_tsne.fit(ref_tsne.obsm[tsne_key], ref_tsne.obs["labels"].values.astype(str))
-                tsne_accuracy = accuracy_score(knn_tsne.predict(adata_tsne.obsm[tsne_key]), 
-                                            adata_tsne.obs["labels"].values.astype(str))
-                print(f"KNN accuracy using {tsne_key} embeddings: {tsne_accuracy:.4f}")
+
+                # Cross-validation on reference t-SNE data
+                reference_tsne_embeddings = ref_tsne.obsm[tsne_key][reference_mask]
+                cv_scores_tsne = cross_val_score(knn_tsne, reference_tsne_embeddings, reference_labels, cv=5)
+                reference_tsne_cv_accuracy = cv_scores_tsne.mean()
+                reference_tsne_cv_std = cv_scores_tsne.std()
+                print(f"Reference CV accuracy using {tsne_key}: {reference_tsne_cv_accuracy:.4f} ± {reference_tsne_cv_std:.4f}")
+
+                # Train final model and evaluate on query
+                knn_tsne.fit(reference_tsne_embeddings, reference_labels)
+                query_tsne_embeddings = adata_tsne.obsm[tsne_key][query_mask]
+                query_tsne_accuracy = accuracy_score(knn_tsne.predict(query_tsne_embeddings), query_labels)
+                print(f"Query accuracy using {tsne_key}: {query_tsne_accuracy:.4f}")
                 
                 # Get colors and cell order
-                colors = utils.get_colors_for(ref_tsne)
+                # Get colors from reference data only
+                adata_ref = ref_tsne[ref_tsne.obs["source"] == "baron_2016h"].copy()
+                colors = utils.get_colors_for(adata_ref)
                 cell_order = list(colors.keys())
                 num_cell_types = len(np.unique(ref_tsne.obs["labels"]))
                 
@@ -143,7 +189,7 @@
                 reference_mask = ref_tsne.obs["source"] == "baron_2016h"
                 
                 # Plot reference points in colors on the left
-                utils.plot(ref_tsne.obsm[tsne_key][reference_mask], ref_tsne.obs["labels"], ax=ax[0], 
+                utils.plot(ref_tsne.obsm[tsne_key][reference_mask], ref_tsne.obs["labels"][reference_mask], ax=ax[0], 
                         title=f"Reference embedding ({viz_method} from {embedding_key})", 
                         colors=colors, s=3, label_order=cell_order,
                         legend_kwargs=dict(loc="upper center", bbox_to_anchor=(0.5, 0.05), 
@@ -167,7 +213,7 @@
                 utils.plot(adata_tsne.obsm[tsne_key][query_mask], adata_tsne.obs["labels"], ax=ax[1], colors=colors, 
                         draw_legend=False, s=6, label_order=cell_order, alpha=0.7)
                 # Right plot title  
-                ax[1].set_title(f"{reference_mask} (gray) + {query_mask} (colored) ({viz_method} from {embedding_key})")
+                ax[1].set_title(f"Reference {reference_mask} (gray) +  Query {query_mask} (colored) ({viz_method} from {embedding_key})")
                 
                 # Set equal axis for all plots
                 for ax_ in ax.ravel(): 
@@ -188,12 +234,16 @@
                 # Add KNN accuracy text to the figure
                 embedding_clean = embedding_key.replace('X_', '').replace('_', '')
                 viz_label = "UMAP" if 'umap' in embedding_key.lower() else "t-SNE"
-                fig.text(0.5, 0.10, f"KNN({embedding_clean}): {orig_accuracy:.4f}    |    KNN({viz_label}): {tsne_accuracy:.4f}", 
-                        ha='center', fontsize=12)
+                fig.text(0.5, 0.10, 
+                        f"Reference CV - {embedding_clean}: {reference_cv_accuracy:.3f}±{reference_cv_std:.3f}  |  "
+                        f"{viz_label}: {reference_tsne_cv_accuracy:.3f}±{reference_tsne_cv_std:.3f}\n"
+                        f"Query Transfer - {embedding_clean}: {query_orig_accuracy:.3f}  |  "
+                        f"{viz_label}: {query_tsne_accuracy:.3f}", 
+                        ha='center', fontsize=10)
                 
                 # Generate output filename
                 embedding_name = embedding_key.replace('X_', '').lower()
-                output_pdf = f"tsne_plot_{base_filename}_{embedding_name}.pdf"
+                output_pdf = f"tsne_plot_cross_validated{base_filename}_{embedding_name}.pdf"
                 
                 # Save plot
                 plt.savefig(output_pdf, dpi=600, bbox_inches="tight", transparent=True)
