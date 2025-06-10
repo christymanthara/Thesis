@@ -188,7 +188,8 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             
             # Get colors and cell order
             # Get colors from reference data only
-            adata_ref = ref_tsne[ref_tsne.obs["source"] == "baron_2016h"].copy()
+            # adata_ref = ref_tsne[ref_tsne.obs["source"] == "baron_2016h"].copy()
+            adata_ref = ref_tsne[reference_mask].copy()
             colors = utils.get_colors_for(adata_ref)
             cell_order = list(colors.keys())
             num_cell_types = len(np.unique(ref_tsne.obs["labels"]))
@@ -207,7 +208,11 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             reference_mask = ref_tsne.obs["source"] == "baron_2016h"
             
             # Plot reference points in colors on the left
-            utils.plot(ref_tsne.obsm[tsne_key][reference_mask], ref_tsne.obs["labels"][reference_mask], ax=ax[0], 
+            # Plot reference points in colors on the left
+            ref_coords = ref_tsne.obsm[tsne_key][reference_mask]
+            ref_labels = ref_tsne.obs["labels"][reference_mask]
+            
+            utils.plot(ref_coords, ref_labels, ax=ax[0], 
                     title=f"Reference embedding ({viz_method} from {embedding_key})", 
                     colors=colors, s=3, label_order=cell_order,
                     legend_kwargs=dict(loc="upper center", bbox_to_anchor=(0.5, 0.05), 
@@ -222,13 +227,16 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             colors_bw = {1: "#666666"}
             
             #First plot the reference points in black and white
-            utils.plot(ref_tsne.obsm[tsne_key][reference_mask], np.ones_like(ref_tsne.obs["labels"]), ax=ax[1], 
+            utils.plot(ref_coords, np.ones(len(ref_coords)), ax=ax[1], 
                     colors=colors_bw, alpha=0.05, s=3, draw_legend=False)
             
             
             query_mask = adata_tsne.obs["source"] == "xin_2016"
             # Then plot the transformed samples with colors
-            utils.plot(adata_tsne.obsm[tsne_key][query_mask], adata_tsne.obs["labels"], ax=ax[1], colors=colors, 
+            query_coords = adata_tsne.obsm[tsne_key][query_mask]
+            query_labels = adata_tsne.obs["labels"][query_mask]
+            
+            utils.plot(query_coords, query_labels, ax=ax[1], colors=colors, 
                     draw_legend=False, s=6, label_order=cell_order, alpha=0.7)
             # Right plot title  
             ax[1].set_title(f"Reference {reference_mask} (gray) +  Query {query_mask} (colored) ({viz_method} from {embedding_key})")
@@ -238,9 +246,13 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
                 ax_.axis("equal")
             
             # Determine coordinate range from visualization data
-            tsne_min = min(ref_tsne.obsm[tsne_key].min(), adata_tsne.obsm[tsne_key].min())
-            tsne_max = max(ref_tsne.obsm[tsne_key].max(), adata_tsne.obsm[tsne_key].max())
-            coord_range = tsne_min - 1, tsne_max + 1
+            # tsne_min = min(ref_tsne.obsm[tsne_key].min(), adata_tsne.obsm[tsne_key].min())
+            # tsne_max = max(ref_tsne.obsm[tsne_key].max(), adata_tsne.obsm[tsne_key].max())
+            # coord_range = tsne_min - 1, tsne_max + 1
+            all_coords = np.vstack([ref_coords, query_coords])
+            coord_min = all_coords.min()
+            coord_max = all_coords.max()
+            coord_range = coord_min - 1, coord_max + 1
             
             for ax_ in ax.ravel():
                 ax_.set_xlim(*coord_range), ax_.set_ylim(*coord_range)
