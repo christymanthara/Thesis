@@ -8,6 +8,7 @@ from sklearn.metrics import accuracy_score
 import utils
 import os
 from sklearn.model_selection import cross_val_score
+from knn_plot_table import create_results_table
 
 from compute_tsne_embeddings import compute_tsne_embedding
 
@@ -54,24 +55,55 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
     
     # Get all embedding keys from obsm
     embedding_keys = [key for key in adata.obsm.keys() if key.startswith('X_')]
-    
+
+    # Check if original_X exists in layers and add it to processing list
+    if 'original_X' in adata.layers.keys():
+        embedding_keys.append('original_X')  # Add as special case
+        print("Found original_X in layers, adding to processing list")
+
     if not embedding_keys:
         print("No embeddings found in obsm (looking for keys starting with 'X_')")
         return
-    
+
     print(f"Found embeddings: {embedding_keys}")
-    
+
     # Process each embedding
     for embedding_key in embedding_keys:
         print(f"\nProcessing embedding: {embedding_key}")
         
-        # Check if embedding exists in both files
-        if embedding_key not in adata.obsm:
-            print(f"Embedding {embedding_key} not found in main file, skipping...")
-            continue
-        if embedding_key not in ref_adata.obsm:
-            print(f"Embedding {embedding_key} not found in reference file, skipping...")
-            continue
+        # Handle original_X differently
+        if embedding_key == 'original_X':
+            # Check if original_X exists in both files' layers
+            if 'original_X' not in adata.layers.keys():
+                print(f"original_X not found in main file layers, skipping...")
+                continue
+            if 'original_X' not in ref_adata.layers.keys():
+                print(f"original_X not found in reference file layers, skipping...")
+                continue
+            
+            print("Extracting original_X data from layers...")
+            try:
+                # Temporarily add original_X data to obsm for processing
+                adata.obsm['X_original_temp'] = adata.layers['original_X']
+                ref_adata.obsm['X_original_temp'] = ref_adata.layers['original_X']
+                
+                # Set the key we'll use for processing
+                processing_key = 'X_original_temp'
+                
+            except Exception as e:
+                print(f"Error extracting original_X data: {str(e)}")
+                continue
+        else:
+            # For regular embeddings in obsm
+            # Check if embedding exists in both files
+            if embedding_key not in adata.obsm:
+                print(f"Embedding {embedding_key} not found in main file, skipping...")
+                continue
+            if embedding_key not in ref_adata.obsm:
+                print(f"Embedding {embedding_key} not found in reference file, skipping...")
+                continue
+            
+            processing_key = embedding_key
         
         # Create copies for processing
         adata_copy = adata.copy()
@@ -87,14 +119,20 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             # Use UMAP directly as the "t-SNE" visualization
             adata_tsne = adata_copy.copy()
             ref_tsne = ref_copy.copy()
-            tsne_key = embedding_key  # Use the original UMAP embedding
+            tsne_key = processing_key  
         else:
             try:
-                # Compute t-SNE for both datasets
-                adata_tsne = compute_tsne_embedding(adata_copy, embedding_key=embedding_key, output_key=tsne_key)
-                ref_tsne = compute_tsne_embedding(ref_copy, embedding_key=embedding_key, output_key=tsne_key)
+                # Compute t-SNE for both datasets using the processing key
+                adata_tsne = compute_tsne_embedding(adata_copy, embedding_key=processing_key, output_key=tsne_key)
+                ref_tsne = compute_tsne_embedding(ref_copy, embedding_key=processing_key, output_key=tsne_key)
             except Exception as e:
                 print(f"Error computing t-SNE for {embedding_key}: {str(e)}")
+                # Clean up temporary keys if they exist
+                if embedding_key == 'original_X':
+                    if 'X_original_temp' in adata.obsm:
+                        del adata.obsm['X_original_temp']
+                    if 'X_original_temp' in ref_adata.obsm:
+                        del ref_adata.obsm['X_original_temp']
                 continue
         
         try:
@@ -125,7 +163,8 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             #Cross validation to get a more robust estimate of accuracy
             print(f"Cross-validating KNN on reference embeddings for {embedding_key}...")
             # Extract reference data for cross-validation
-            reference_embeddings = ref_tsne.obsm[embedding_key][reference_mask]
+            # reference_embeddings = ref_tsne.obsm[embedding_key][reference_mask]
+            reference_embeddings = ref_tsne.obsm[processing_key][reference_mask]
             reference_labels = ref_tsne.obs["labels"][reference_mask].values.astype(str)
 
             # Cross-validation on reference data
@@ -140,11 +179,12 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
 
             # Evaluate only on query data
             query_mask = adata_tsne.obs["source"] == "xin_2016"
-            query_embeddings = adata_tsne.obsm[embedding_key][query_mask]
+            # query_embeddings = adata_tsne.obsm[embedding_key][query_mask]
+            query_embeddings = adata_tsne.obsm[processing_key][query_mask]
             query_labels = adata_tsne.obs["labels"][query_mask].values.astype(str)
             query_orig_accuracy = accuracy_score(knn_orig.predict(query_embeddings), query_labels)
             print(f"Query accuracy using {embedding_key}: {query_orig_accuracy:.4f}")
-            
+
             # Run KNN classification using t-SNE embeddings
             # print(f"Running KNN classification using {tsne_key} embeddings...")
             # knn_tsne = KNeighborsClassifier(n_neighbors=10)
@@ -172,24 +212,17 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             query_tsne_accuracy = accuracy_score(knn_tsne.predict(query_tsne_embeddings), query_labels)
             print(f"Query accuracy using {tsne_key}: {query_tsne_accuracy:.4f}")
             
-            # Store results for table
-        #     embedding_clean = embedding_key.replace('X_', '')
-        #     viz_method = "UMAP" if 'umap' in embedding_key.lower() else "t-SNE"
-            
-        #     results_table[f"{embedding_clean}"] = {
-        #         'Reference CV': f"{reference_cv_accuracy:.3f}±{reference_cv_std:.3f}",
-        #         'Query Transfer': f"{query_orig_accuracy:.3f}"
-        #     }
-            
-        #     results_table[f"{embedding_clean} ({viz_method})"] = {
-        #         'Reference CV': f"{reference_tsne_cv_accuracy:.3f}±{reference_tsne_cv_std:.3f}",
-        #         'Query Transfer': f"{query_tsne_accuracy:.3f}"
-        # }
         
-            # Store results for table - only original embedding results
+        
             embedding_clean = embedding_key.replace('X_', '')
 
-            results_table[f"{embedding_clean}"] = {
+            # Special display name for original_X
+            if embedding_key == 'original_X':
+                display_name = 'RAW data (original_X)'
+            else:
+                display_name = embedding_clean
+
+            results_table[f"{display_name}"] = {
                 'Reference CV': f"{reference_cv_accuracy:.3f}±{reference_cv_std:.3f}",
                 'Query Transfer': f"{query_orig_accuracy:.3f}"
             }
@@ -280,9 +313,8 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             #         ha='center', fontsize=10)
             
             fig.text(0.5, 0.10, 
-                    f"Reference CV - {embedding_clean}: {reference_cv_accuracy:.3f}±{reference_cv_std:.3f}  | ",
-                    f"Query Transfer - {embedding_clean}: {query_orig_accuracy:.3f}  |  ",
-                    # f"{viz_label}: {query_tsne_accuracy:.3f}", 
+                    f"Reference CV - {embedding_clean}: {reference_cv_accuracy:.3f}±{reference_cv_std:.3f}  |  "
+                    f"Query Transfer - {embedding_clean}: {query_orig_accuracy:.3f}", 
                     ha='center', fontsize=10)
             
             
@@ -298,6 +330,14 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
         except Exception as e:
             print(f"Error processing embedding {embedding_key}: {str(e)}")
             continue
+        
+        finally:
+        # Clean up temporary keys
+            if embedding_key == 'original_X':
+                if 'X_original_temp' in adata.obsm:
+                    del adata.obsm['X_original_temp']
+                if 'X_original_temp' in ref_adata.obsm:
+                    del ref_adata.obsm['X_original_temp']
         # Generate summary table
     if results_table:
         create_results_table(results_table, base_filename, reference_file)
@@ -305,88 +345,12 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
     
     print(f"\nCompleted processing all embeddings for {file_path}")
     
-def create_results_table(results_table, base_filename, reference_file=None):
-    """
-    Create a summary table of all KNN results and save as PDF.
-
-    Parameters:
-    -----------
-    results_table : dict
-        Dictionary containing results for each embedding
-    base_filename : str
-        Base filename for output
-    reference_file : str, optional
-        Reference file path for naming
-    """
-
-    # Convert results to DataFrame
-    df = pd.DataFrame.from_dict(results_table, orient='index')
-
-    # Create figure for table
-    fig, ax = plt.subplots(figsize=(12, max(6, len(df) * 0.4 + 2)))
-    ax.axis('tight')
-    ax.axis('off')
-
-    # Create title
-    ref_name = os.path.splitext(os.path.basename(reference_file))[0] if reference_file else base_filename
-    title = f"KNN Classification Results Summary\n{base_filename} vs {ref_name}"
-    fig.suptitle(title, fontsize=16, fontweight='bold', y=0.95)
-
-    # Create table
-    table = ax.table(cellText=df.values,
-                    rowLabels=df.index,
-                    colLabels=df.columns,
-                    cellLoc='center',
-                    loc='center',
-                    bbox=[0, 0, 1, 1])
-
-    # Style the table
-    table.auto_set_font_size(False)
-    table.set_fontsize(10)
-    table.scale(1, 2)
-
-    # Color the header
-    for i in range(len(df.columns)):
-        table[(0, i)].set_facecolor('#4CAF50')
-        table[(0, i)].set_text_props(weight='bold', color='white')
-
-    # Color the row labels
-    for i in range(1, len(df) + 1):
-        table[(i, -1)].set_facecolor('#E8F5E8')
-        table[(i, -1)].set_text_props(weight='bold')
-
-    # Alternate row colors for better readability
-    for i in range(1, len(df) + 1):
-        for j in range(len(df.columns)):
-            if i % 2 == 0:
-                table[(i, j)].set_facecolor('#F5F5F5')
-
-    # Add explanatory text
-    explanation = ("Reference CV: Cross-validation accuracy on reference dataset\n"
-                    "Query Transfer: Accuracy when transferring to query dataset\n"
-                    "Values show mean±std for CV, single value for transfer")
-
-    fig.text(0.5, 0.02, explanation, ha='center', fontsize=9, 
-                style='italic', wrap=True)
-
-    # Save table as PDF
-    table_output = f"knn_results_summary_final_{base_filename}.pdf"
-    plt.savefig(table_output, dpi=300, bbox_inches="tight", 
-                facecolor='white', edgecolor='none')
-    print(f"Saved results table as {table_output}")
-    plt.close()
-
-    # Also save as CSV for easy access
-    csv_output = f"knn_results_summary_{base_filename}.csv"
-    df.to_csv(csv_output)
-    print(f"Saved results table as {csv_output}")
-
 
 
 # Example usage
 if __name__ == "__main__":
     # Process single file (uses same file as reference)
-    compute_knn_tsne_all("/shared/home/christy.jo.manthara/batch-effect-analysis/output/baron_2016h_xin_2016_preprocessed_uce_adata_X_scvi_X_scanvi_X_uce_test.h5ad", skip_preprocessing=True)
+    compute_knn_tsne_all("/shared/home/christy.jo.manthara/batch-effect-analysis/output/baron_2016h_xin_2016_preprocessed_with_original_X_uce_adata_X_scvi_X_scanvi_X_uce_test.h5ad", skip_preprocessing=True)
     
     # Process with separate reference file
     # compute_knn_tsne_all("xin_2016_scGPT.h5ad", reference_file="baron_2016h_scGPT.h5ad", skip_preprocessing=True)
