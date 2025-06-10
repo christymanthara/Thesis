@@ -226,8 +226,8 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
                     legend_kwargs=dict(loc="upper center", bbox_to_anchor=(0.5, 0.05), 
                                         bbox_transform=fig.transFigure, labelspacing=1, 
                                         ncol=num_cell_types // 2 + 1))
-            # Left plot title
-            ax[0].set_title(f"Reference embedding - {reference_mask} only ({viz_method} from {embedding_key})")
+            # Left plot title  - they are creating visualization issues
+            # ax[0].set_title(f"Reference embedding - {reference_mask} only ({viz_method} from {embedding_key})")
 
             
             # Plot transformed samples on the right
@@ -246,8 +246,8 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             
             utils.plot(query_coords, query_labels, ax=ax[1], colors=colors, 
                     draw_legend=False, s=6, label_order=cell_order, alpha=0.7)
-            # Right plot title  
-            ax[1].set_title(f"Reference {reference_mask} (gray) +  Query {query_mask} (colored) ({viz_method} from {embedding_key})")
+            # Right plot title  - they are creating visualization issues
+            # ax[1].set_title(f"Reference {reference_mask} (gray) +  Query {query_mask} (colored) ({viz_method} from {embedding_key})")
             
             # Set equal axis for all plots
             for ax_ in ax.ravel(): 
