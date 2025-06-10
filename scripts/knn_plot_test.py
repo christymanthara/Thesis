@@ -173,18 +173,26 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             print(f"Query accuracy using {tsne_key}: {query_tsne_accuracy:.4f}")
             
             # Store results for table
-            embedding_clean = embedding_key.replace('X_', '')
-            viz_method = "UMAP" if 'umap' in embedding_key.lower() else "t-SNE"
+        #     embedding_clean = embedding_key.replace('X_', '')
+        #     viz_method = "UMAP" if 'umap' in embedding_key.lower() else "t-SNE"
             
+        #     results_table[f"{embedding_clean}"] = {
+        #         'Reference CV': f"{reference_cv_accuracy:.3f}±{reference_cv_std:.3f}",
+        #         'Query Transfer': f"{query_orig_accuracy:.3f}"
+        #     }
+            
+        #     results_table[f"{embedding_clean} ({viz_method})"] = {
+        #         'Reference CV': f"{reference_tsne_cv_accuracy:.3f}±{reference_tsne_cv_std:.3f}",
+        #         'Query Transfer': f"{query_tsne_accuracy:.3f}"
+        # }
+        
+            # Store results for table - only original embedding results
+            embedding_clean = embedding_key.replace('X_', '')
+
             results_table[f"{embedding_clean}"] = {
                 'Reference CV': f"{reference_cv_accuracy:.3f}±{reference_cv_std:.3f}",
                 'Query Transfer': f"{query_orig_accuracy:.3f}"
             }
-            
-            results_table[f"{embedding_clean} ({viz_method})"] = {
-                'Reference CV': f"{reference_tsne_cv_accuracy:.3f}±{reference_tsne_cv_std:.3f}",
-                'Query Transfer': f"{query_tsne_accuracy:.3f}"
-        }
             
             # Get colors and cell order
             # Get colors from reference data only
