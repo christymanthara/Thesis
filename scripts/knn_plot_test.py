@@ -273,7 +273,7 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             
             # Generate output filename
             embedding_name = embedding_key.replace('X_', '').lower()
-            output_pdf = f"tsne_plot_cross_validated{base_filename}_{embedding_name}.pdf"
+            output_pdf = f"tsne_plot_cross_validated_2_{base_filename}_{embedding_name}.pdf"
             
             # Save plot
             plt.savefig(output_pdf, dpi=600, bbox_inches="tight", transparent=True)
