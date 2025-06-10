@@ -120,6 +120,23 @@ def analyze_adata(adata_path, title=None,  cell_type_column="", batch_column="")
     else:
         print("\n📐 No obsm (Multi-dimensional Annotations) available in this dataset.")
 
+# Show layers if they exist
+    if hasattr(adata, 'layers') and adata.layers:
+        print(f"\n📚 Available layers in the dataset:")
+        for key in adata.layers.keys():
+            layer_shape = adata.layers[key].shape
+            print(f"  - {key}: shape {layer_shape}")
+            # Show preview of the first 2 rows and up to 5 columns
+            try:
+                preview = adata.layers[key][:2, :min(5, adata.layers[key].shape[1])]
+                print(f"    Preview (first 2 cells, up to 5 genes):")
+                for i, row in enumerate(preview):
+                    print(f"      Cell {i}: {row}")
+            except Exception as e:
+                print(f"    ⚠️ Error displaying preview for layer '{key}': {e}")
+    else:
+        print("\n📚 No layers available in this dataset.")
+
 
 if __name__ == "__main__":
     # Example usage
