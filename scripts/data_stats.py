@@ -1,18 +1,23 @@
 import anndata
 import scanpy as sc
+import numpy as np
 
 
-def analyze_adata(adata_path, title=None):
+def analyze_adata(adata_path, title=None,  cell_type_column="", batch_column=""):
     """
     Analyze and print detailed statistics about an AnnData object,
-    including inspection of gene identifiers.
+    including inspection of gene identifiers and obsm values.
     
     Parameters:
     -----------
-    adata : AnnData
-        The AnnData object to analyze
+    adata_path : str
+        Path to the AnnData h5ad file
     title : str, optional
         Optional title to display before the analysis
+    cell_type_column : str, optional
+        Column name in obs containing cell type information
+    batch_column : str, optional
+        Column name in obs containing batch information
     """
 
     adata = anndata.read_h5ad(adata_path)
@@ -31,6 +36,25 @@ def analyze_adata(adata_path, title=None):
     print(f"🔍 Available columns in obs (Cell Metadata):")
     print(list(adata.obs.columns))
     
+    # Show unique values in each obs column
+    print(f"\n📋 Unique values in each obs column:")
+    for col in adata.obs.columns:
+        unique_vals = adata.obs[col].unique()
+        n_unique = len(unique_vals)
+        
+        # For columns with few unique values, show all values
+        if n_unique <= 10:
+            print(f"  🔹 {col} ({n_unique} unique): {sorted(unique_vals.tolist())}")
+        else:
+            # For columns with many unique values, show count and first few examples
+            print(f"  🔹 {col} ({n_unique} unique): {sorted(unique_vals.tolist())[:5]}... (showing first 5)")
+        
+        # Show value counts for categorical-like data
+        if n_unique <= 20:  # Only show counts for columns with reasonable number of categories
+            value_counts = adata.obs[col].value_counts()
+            print(f"      Value counts: {dict(value_counts)}")
+    
+    
     # Metadata in var
     print(f"🔬 Available columns in var (Gene Metadata):")
     print(list(adata.var.columns))
@@ -48,6 +72,28 @@ def analyze_adata(adata_path, title=None):
     else:
         print("🧬 No explicit gene name/symbol columns found. Gene identifiers are likely in the var index.")
     
+    
+    # Cell type and batch analysis
+    print(f"\n📋 Cell Type and Batch Analysis:")
+    if not cell_type_column and not batch_column:
+        print("  Parameters not passed.")
+    else:
+        if cell_type_column:
+            if cell_type_column in adata.obs.columns:
+                unique_cell_types = len(adata.obs[cell_type_column].unique())
+                print(f"  🧬 Number of unique cell types in '{cell_type_column}': {unique_cell_types}")
+            else:
+                print(f"  ⚠️ Cell type column '{cell_type_column}' not found in obs.")
+        
+        if batch_column:
+            if batch_column in adata.obs.columns:
+                unique_batches = len(adata.obs[batch_column].unique())
+                batch_names = adata.obs[batch_column].unique().tolist()
+                print(f"  🔬 Number of unique batches in '{batch_column}': {unique_batches}")
+                print(f"  🔬 Batch names: {batch_names}")
+            else:
+                print(f"  ⚠️ Batch column '{batch_column}' not found in obs.")
+    
     # Labels if available
     if 'labels' in adata.obs:
         print(f"🏷️ Unique Labels in obs['labels']:")
@@ -56,66 +102,24 @@ def analyze_adata(adata_path, title=None):
     # Available unstructured data
     print(f"📦 Available keys in uns (Unstructured Data):")
     print(list(adata.uns.keys()))
-
-
-# def print_adata_stats(file_path):
-#     """
-#     Reads an AnnData file and prints key statistics.
-
-#     Parameters:
-#     - file_path: str, path to the .h5ad file
-
-#     Outputs:
-#     - Shape of the dataset (Cells × Genes)
-#     - Number of genes before and after filtering
-#     - Lists available columns in obs (cell metadata) and var (gene metadata)
-#     - Prints available keys in uns (unstructured data)
-#     """
     
-#     # Load the AnnData object
-#     adata = anndata.read_h5ad(file_path)
+    # Show obsm values if they exist
+    if hasattr(adata, 'obsm') and adata.obsm:
+        print(f"\n📐 Available keys in obsm (Multi-dimensional Annotations):")
+        for key in adata.obsm.keys():
+            shape = adata.obsm[key].shape
+            print(f"  - {key}: shape {shape}")
+            # Show a preview of the first few values for each embedding
+            if isinstance(adata.obsm[key], np.ndarray):
+                print(f"    Preview (first 2 cells, up to 5 dimensions):")
+                preview = adata.obsm[key][:2, :min(5, adata.obsm[key].shape[1])]
+                for i, row in enumerate(preview):
+                    print(f"      Cell {i}: {row}")
+            else:
+                print(f"    Type: {type(adata.obsm[key])}")
+    else:
+        print("\n📐 No obsm (Multi-dimensional Annotations) available in this dataset.")
 
-#     # Initial shape
-#     initial_genes = adata.shape[1]
-    
-#     # Filter genes with at least one count
-#     sc.pp.filter_genes(adata, min_counts=1)
-#     filtered_genes = adata.shape[1]
-
-#     print(f"\n📊 Dataset Shape: {adata.shape} (Cells × Genes)")
-#     print(f"🧬 Genes Before Filtering: {initial_genes}")
-#     print(f"🧬 Genes After Filtering: {filtered_genes}")
-
-#     # Cell metadata summary
-#     print("\n🔍 Available columns in obs (Cell Metadata):")
-#     if not adata.obs.empty:
-#         print(list(adata.obs.columns))
-#     else:
-#         print("⚠️ No columns found in obs.")
-
-#     # Gene metadata summary
-#     print("\n🔬 Available columns in var (Gene Metadata):")
-#     if not adata.var.empty:
-#         print(list(adata.var.columns))
-#     else:
-#         print("⚠️ No columns found in var.")
-
-#     # Unique labels in obs (if available)
-#     if "labels" in adata.obs.columns:
-#         print("\n🏷️ Unique Labels in obs['labels']:")
-#         print(adata.obs["labels"].value_counts())
-
-#     #gene identifiers if any
-#     if "gene_ids" in adata.var.index:
-#         print("\n🧬 Gene Identifiers in var['gene_ids']:")
-#         print(adata.var["gene_ids"].value_counts())
-
-#     # Unstructured metadata
-#     print("\n📦 Available keys in uns (Unstructured Data):")
-#     if adata.uns:
-#         print(list(adata.uns.keys()))
-#     else:
-#         print("⚠️ No keys found in uns.")
 
 if __name__ == "__main__":
     # Example usage
@@ -124,15 +128,69 @@ if __name__ == "__main__":
     # print_adata_stats("../datasets/baron_2016h.h5ad")
     # print_adata_stats("/home/thechristyjo/Documents/Thesis/datasets/baron_2016h.h5ad")
     # print_adata_stats("/home/thechristyjo/Documents/Thesis/datasets/xin_2016.h5ad")
+    # analyze_adata(
+    #     "/home/thechristyjo/Documents/Thesis/datasets/baron_2016h.h5ad",
+    #     title="Baron 2016 Dataset Analysis"
+    # )
+    # analyze_adata(
+    #     "/home/thechristyjo/Documents/Thesis/datasets/xin_2016.h5ad",
+    #     title="Xin 2016 Dataset Analysis"
+    # )
     analyze_adata(
-        "/home/thechristyjo/Documents/Thesis/datasets/baron_2016h.h5ad",
-        title="Baron 2016 Dataset Analysis"
-    )
-    analyze_adata(
-        "/home/thechristyjo/Documents/Thesis/datasets/xin_2016.h5ad",
-        title="Xin 2016 Dataset Analysis"
-    )
-    analyze_adata(
-        "/home/thechristyjo/Documents/Thesis/adata_concat_scGPT_baron_2016h_xin_2016.h5ad",
+        "adata_concat_scGPT_baron_2016h_xin_2016.h5ad",
         title="Concatenated scGPT Dataset Analysis"
     )
+    # analyze_adata(
+    #     "F:/Thesis/UCE/baron_2016h_uce_adata.h5ad",
+    #     title="Baron UCE"
+    # )
+    analyze_adata(
+        "F:/Thesis/Datasets/baron_2016h_uce_adata.h5ad",
+        title="Baron UCE"
+    )
+    
+    analyze_adata(
+        "F:/Thesis/adata_concat_uce_baron_2016h_uce_adata_xin_2016_uce_adata.h5ad",
+        title="Concatenated UCE Baron and Xin Datasets with uce_adata"
+    )
+    
+    analyze_adata(
+        "adata_concat_scGPT_baron_2016h_xin_2016.h5ad",
+        title="Concatenated scGPT Baron and Xin Datasets",
+        batch_column="batch_id",
+        cell_type_column="labels"
+    )
+    
+    analyze_adata(
+        "F:/Thesis/adata_concat_scGPT_baron_2016h_xin_2016_X_scvi_X_scanvi_X_scGPT.h5ad",
+        title="Concatenated scGPT Baron and Xin Datasets with embeddings",
+        batch_column="batch_id",
+        cell_type_column="labels"
+    )
+    
+    analyze_adata(
+        "F:/Thesis/baron_2016hxin_2016.h5ad",
+        title="Baron 2016h and Xin 2016 Dataset Analysis",
+        batch_column="batch_id",    
+        cell_type_column="labels"
+    ) #the purest dataset with no embeddings, just the raw data
+    # analyze_adata(
+    #     "F:/Thesis/adata_concat_UCE_sample_proc_lung_train_uce_adata_sample_proc_lung_test_uce_adata.h5ad",
+    #     title="lung data"
+    # )
+    
+    
+    analyze_adata(
+        "F:/Thesis/baron_2016hxin_2016_uce_adata.h5ad",
+        title="Baron 2016h and Xin 2016 Dataset Analysis with UCE",
+        batch_column="batch_id",    
+        cell_type_column="labels"
+    )
+    
+    analyze_adata(
+        "baron_2016hxin_2016_uce_adata_X_scvi_X_scanvi_X_scGPT_test.h5ad",
+        title="Baron 2016h and Xin 2016 Dataset Analysis with UCE and other embeddings",
+        batch_column="batch_id",    
+        cell_type_column="labels"
+    )
+        
