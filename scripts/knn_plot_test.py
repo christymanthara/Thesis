@@ -1,6 +1,7 @@
 import anndata
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 import string
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
