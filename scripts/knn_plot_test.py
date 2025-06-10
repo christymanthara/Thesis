@@ -105,7 +105,13 @@
                 else:
                     knn_orig = KNeighborsClassifier(n_neighbors=10)
                 
-                knn_orig.fit(ref_tsne.obsm[embedding_key], ref_tsne.obs["labels"].values.astype(str))
+                # KNN training should filter to reference only
+                
+                reference_mask = ref_tsne.obs["source"] == "baron_2016h"
+                
+                # Fit KNN on the reference embeddings; we are using holdout validation here
+                print(f"Fitting KNN on reference embeddings for {embedding_key}...")
+                knn_orig.fit(ref_tsne.obsm[embedding_key][reference_mask], ref_tsne.obs["labels"][reference_mask].values.astype(str))
                 orig_accuracy = accuracy_score(knn_orig.predict(adata_tsne.obsm[embedding_key]), 
                                             adata_tsne.obs["labels"].values.astype(str))
                 print(f"KNN accuracy using {embedding_key} embeddings: {orig_accuracy:.4f}")
