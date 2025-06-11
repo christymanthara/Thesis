@@ -10,9 +10,10 @@ import os
 from sklearn.model_selection import cross_val_score
 from knn_plot_table import create_results_table
 
+from compute_tsne_embeddings import compute_tsne_embedding_pavlin
 from compute_tsne_embeddings import compute_tsne_embedding
 
-def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=False):
+def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=False, n_jobs=1):
     """
     Compute KNN and t-SNE for all embeddings in an AnnData file and save each plot as a separate PDF.
     
@@ -24,6 +25,9 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
         Path to reference AnnData file for KNN training. If None, uses the same file for both training and testing
     skip_preprocessing : bool, default False
         Whether to skip preprocessing and load data directly
+    n_jobs : int, default 1
+        Number of threads to use for t-SNE computation    
+    
     """
     
     # Dictionary to store results for table generation
@@ -122,18 +126,46 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             tsne_key = processing_key  
         else:
             try:
-                # Compute t-SNE for both datasets using the processing key
-                adata_tsne = compute_tsne_embedding(adata_copy, embedding_key=processing_key, output_key=tsne_key)
-                ref_tsne = compute_tsne_embedding(ref_copy, embedding_key=processing_key, output_key=tsne_key)
+                # Check if this is a PCA embedding to use Pavlin's method
+                if 'pca' in embedding_key.lower():
+                    print(f"Using Pavlin's method for PCA embedding: {embedding_key}")
+                    # Use Pavlin's method for PCA embeddings
+                    adata_tsne = compute_tsne_embedding_pavlin(adata_copy, embedding_key=processing_key, 
+                                                             output_key=tsne_key, n_jobs=n_jobs)
+                    ref_tsne = compute_tsne_embedding_pavlin(ref_copy, embedding_key=processing_key, 
+                                                           output_key=tsne_key, n_jobs=n_jobs)
+                else:
+                    # Use default method for all other embeddings
+                    adata_tsne = compute_tsne_embedding(adata_copy, embedding_key=processing_key, 
+                                                      output_key=tsne_key, n_jobs=n_jobs)
+                    ref_tsne = compute_tsne_embedding(ref_copy, embedding_key=processing_key, 
+                                                    output_key=tsne_key, n_jobs=n_jobs)
             except Exception as e:
                 print(f"Error computing t-SNE for {embedding_key}: {str(e)}")
+                print("Trying with n_jobs=1...")
                 # Clean up temporary keys if they exist
-                if embedding_key == 'original_X':
-                    if 'X_original_temp' in adata.obsm:
-                        del adata.obsm['X_original_temp']
-                    if 'X_original_temp' in ref_adata.obsm:
-                        del ref_adata.obsm['X_original_temp']
-                continue
+                try:
+                    # Fallback to single thread
+                    if 'pca' in embedding_key.lower():
+                        print(f"Retrying with Pavlin's method and n_jobs=1 for: {embedding_key}")
+                        adata_tsne = compute_tsne_embedding_pavlin(adata_copy, embedding_key=processing_key, 
+                                                                 output_key=tsne_key, n_jobs=1)
+                        ref_tsne = compute_tsne_embedding_pavlin(ref_copy, embedding_key=processing_key, 
+                                                               output_key=tsne_key, n_jobs=1)
+                    else:
+                        adata_tsne = compute_tsne_embedding(adata_copy, embedding_key=processing_key, 
+                                                          output_key=tsne_key, n_jobs=1)
+                        ref_tsne = compute_tsne_embedding(ref_copy, embedding_key=processing_key, 
+                                                        output_key=tsne_key, n_jobs=1)
+                except Exception as e2:
+                    print(f"Error computing t-SNE for {embedding_key} even with n_jobs=1: {str(e2)}")
+                    # Clean up temporary keys if they exist
+                    if embedding_key == 'original_X':
+                        if 'X_original_temp' in adata.obsm:
+                            del adata.obsm['X_original_temp']
+                        if 'X_original_temp' in ref_adata.obsm:
+                            del ref_adata.obsm['X_original_temp']
+                    continue
         
         try:
             # Run KNN classification using original embeddings
@@ -142,6 +174,9 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             # Determine metric based on embedding type
             if 'scGPT' in embedding_key or 'scgpt' in embedding_key:
                 knn_orig = KNeighborsClassifier(n_neighbors=10, metric='cosine')
+                
+            elif 'tsne_pavlin' in embedding_key:
+                knn_orig = KNeighborsClassifier(n_neighbors=10, metric='cosine') #as per literature, pavlins method works well with cosine similarity
             elif 'scVI' in embedding_key or 'scANVI' in embedding_key:
                 # scVI/scANVI embeddings work well with cosine similarity
                 knn_orig = KNeighborsClassifier(n_neighbors=10, metric='cosine')
@@ -151,15 +186,7 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             # KNN training should filter to reference only
             
             reference_mask = ref_tsne.obs["source"] == "baron_2016h"
-            
-            # # Fit KNN on the reference embeddings; we are using holdout validation here
-            # print(f"Fitting KNN on reference embeddings for {embedding_key}...")
-            # knn_orig.fit(ref_tsne.obsm[embedding_key][reference_mask], ref_tsne.obs["labels"][reference_mask].values.astype(str))
-            # orig_accuracy = accuracy_score(knn_orig.predict(adata_tsne.obsm[embedding_key]), 
-            #                             adata_tsne.obs["labels"].values.astype(str))
-            # print(f"KNN accuracy using {embedding_key} embeddings: {orig_accuracy:.4f}")
-            
-            
+        
             #Cross validation to get a more robust estimate of accuracy
             print(f"Cross-validating KNN on reference embeddings for {embedding_key}...")
             # Extract reference data for cross-validation
@@ -184,15 +211,6 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             query_labels = adata_tsne.obs["labels"][query_mask].values.astype(str)
             query_orig_accuracy = accuracy_score(knn_orig.predict(query_embeddings), query_labels)
             print(f"Query accuracy using {embedding_key}: {query_orig_accuracy:.4f}")
-
-            # Run KNN classification using t-SNE embeddings
-            # print(f"Running KNN classification using {tsne_key} embeddings...")
-            # knn_tsne = KNeighborsClassifier(n_neighbors=10)
-            # knn_tsne.fit(ref_tsne.obsm[tsne_key][reference_mask], ref_tsne.obs["labels"][reference_mask].values.astype(str))
-            # tsne_accuracy = accuracy_score(knn_tsne.predict(adata_tsne.obsm[tsne_key]), 
-            #                             adata_tsne.obs["labels"].values.astype(str))
-            # print(f"KNN accuracy using {tsne_key} embeddings: {tsne_accuracy:.4f}")
-            
             
             #For cross-validation on t-SNE embeddings
             print(f"Cross-validating KNN on t-SNE embeddings for {tsne_key}...")
@@ -259,9 +277,7 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
                     legend_kwargs=dict(loc="upper center", bbox_to_anchor=(0.5, 0.05), 
                                         bbox_transform=fig.transFigure, labelspacing=1, 
                                         ncol=num_cell_types // 2 + 1))
-            # Left plot title  - they are creating visualization issues
-            # ax[0].set_title(f"Reference embedding - {reference_mask} only ({viz_method} from {embedding_key})")
-
+        
             
             # Plot transformed samples on the right
             # Create a mask for the reference points to plot them in black and white
@@ -350,7 +366,7 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
 # Example usage
 if __name__ == "__main__":
     # Process single file (uses same file as reference)
-    compute_knn_tsne_all("/shared/home/christy.jo.manthara/batch-effect-analysis/output/baron_2016h_xin_2016_preprocessed_with_original_X_uce_adata_X_scvi_X_scanvi_X_uce_test.h5ad", skip_preprocessing=True)
+    compute_knn_tsne_all("/shared/home/christy.jo.manthara/batch-effect-analysis/output/baron_2016h_xin_2016_preprocessed_with_original_X_uce_adata_X_scvi_X_scanvi_X_uce_test.h5ad", skip_preprocessing=True, n_jobs=1)
     
     # Process with separate reference file
     # compute_knn_tsne_all("xin_2016_scGPT.h5ad", reference_file="baron_2016h_scGPT.h5ad", skip_preprocessing=True)
