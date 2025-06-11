@@ -13,7 +13,7 @@ from knn_plot_table import create_results_table
 from compute_tsne_embeddings import compute_tsne_embedding_pavlin
 from compute_tsne_embeddings import compute_tsne_embedding
 
-def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=False, n_jobs=1):
+def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=False, n_jobs=1,split_by_source=True):
     """
     Compute KNN and t-SNE for all embeddings in an AnnData file and save each plot as a separate PDF.
     
@@ -27,32 +27,69 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
         Whether to skip preprocessing and load data directly
     n_jobs : int, default 1
         Number of threads to use for t-SNE computation    
-    
-    """
+    split_by_source : bool, default False
+        Whether to split the data based on obs.source values              
+    """   
     
     # Dictionary to store results for table generation
-    results_table = {}
+     # Dictionary to store results for table generation     
+    results_table = {}          
     
-    # Load the main data file
-    if skip_preprocessing:
-        print(f"Loading {file_path} directly (skipping preprocessing)")
-        adata = anndata.read_h5ad(file_path)
-    else:
-        print(f"Loading and preprocessing {file_path}")
-        # Add preprocessing code here if needed
-        adata = anndata.read_h5ad(file_path)
+    # Load the main data file     
+    if skip_preprocessing:         
+        print(f"Loading {file_path} directly (skipping preprocessing)")         
+        adata = anndata.read_h5ad(file_path)     
+    else:         
+        print(f"Loading and preprocessing {file_path}")         
+        # Add preprocessing code here if needed         
+        adata = anndata.read_h5ad(file_path)          
     
-    # Load reference file if provided, otherwise use the same file
-    if reference_file is not None:
-        if skip_preprocessing:
-            print(f"Loading reference file {reference_file} directly")
-            ref_adata = anndata.read_h5ad(reference_file)
+    # Handle data splitting based on source
+    if split_by_source and 'source' in adata.obs.columns:
+        # Get unique source values
+        source_values = adata.obs['source'].unique()
+        print(f"Found source values: {source_values}")
+        
+        if len(source_values) == 2:
+            # Split into two datasets based on source
+            source1, source2 = source_values
+            print(f"Splitting data into {source1} and {source2}")
+            # Create separate AnnData objects for each source   
+            print("Using {source1} as main data and {source2} as reference")
+            adata_source1 = adata[adata.obs['source'] == source1].copy()
+            adata_source2 = adata[adata.obs['source'] == source2].copy()
+            
+            print(f"Split data: {source1} ({adata_source1.n_obs} cells), {source2} ({adata_source2.n_obs} cells)")
+            
+            # Assign one as main adata and other as reference
+            adata = adata_source1
+            ref_adata = adata_source2
+            
         else:
-            print(f"Loading and preprocessing reference file {reference_file}")
-            ref_adata = anndata.read_h5ad(reference_file)
+            print(f"Warning: Expected 2 source values, found {len(source_values)}. Using original data.")
+            # Fall back to original logic
+            if reference_file is not None:
+                if skip_preprocessing:
+                    print(f"Loading reference file {reference_file} directly")
+                    ref_adata = anndata.read_h5ad(reference_file)
+                else:
+                    print(f"Loading and preprocessing reference file {reference_file}")
+                    ref_adata = anndata.read_h5ad(reference_file)
+            else:
+                print("Using the same file as reference")
+                ref_adata = adata.copy()
     else:
-        print("Using the same file as reference")
-        ref_adata = adata.copy()
+        # Original logic when not splitting by source
+        if reference_file is not None:
+            if skip_preprocessing:
+                print(f"Loading reference file {reference_file} directly")
+                ref_adata = anndata.read_h5ad(reference_file)
+            else:
+                print(f"Loading and preprocessing reference file {reference_file}")
+                ref_adata = anndata.read_h5ad(reference_file)
+        else:
+            print("Using the same file as input for the  reference")
+            ref_adata = adata.copy()
     
     # Get base filename for output
     base_filename = os.path.splitext(os.path.basename(file_path))[0]
@@ -127,7 +164,7 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
         else:
             try:
                 # Check if this is a PCA embedding to use Pavlin's method
-                if 'pca' in embedding_key.lower():
+                if 'X_pca' in embedding_key.lower():
                     print(f"Using Pavlin's method for PCA embedding: {embedding_key}")
                     # Use Pavlin's method for PCA embeddings
                     adata_tsne = compute_tsne_embedding_pavlin(adata_copy, embedding_key=processing_key, 
@@ -146,7 +183,7 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
                 # Clean up temporary keys if they exist
                 try:
                     # Fallback to single thread
-                    if 'pca' in embedding_key.lower():
+                    if 'X_pca' in embedding_key.lower():
                         print(f"Retrying with Pavlin's method and n_jobs=1 for: {embedding_key}")
                         adata_tsne = compute_tsne_embedding_pavlin(adata_copy, embedding_key=processing_key, 
                                                                  output_key=tsne_key, n_jobs=1)
@@ -303,9 +340,7 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
                 ax_.axis("equal")
             
             # Determine coordinate range from visualization data
-            # tsne_min = min(ref_tsne.obsm[tsne_key].min(), adata_tsne.obsm[tsne_key].min())
-            # tsne_max = max(ref_tsne.obsm[tsne_key].max(), adata_tsne.obsm[tsne_key].max())
-            # coord_range = tsne_min - 1, tsne_max + 1
+           
             all_coords = np.vstack([ref_coords, query_coords])
             coord_min = all_coords.min()
             coord_max = all_coords.max()
@@ -321,12 +356,7 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             # Add KNN accuracy text to the figure
             embedding_clean = embedding_key.replace('X_', '').replace('_', '')
             viz_label = "UMAP" if 'umap' in embedding_key.lower() else "t-SNE"
-            # fig.text(0.5, 0.10, 
-            #         f"Reference CV - {embedding_clean}: {reference_cv_accuracy:.3f}±{reference_cv_std:.3f}  |  "
-            #         # f"{viz_label}: {reference_tsne_cv_accuracy:.3f}±{reference_tsne_cv_std:.3f}\n"
-            #         f"Query Transfer - {embedding_clean}: {query_orig_accuracy:.3f}  |  "
-            #         # f"{viz_label}: {query_tsne_accuracy:.3f}", 
-            #         ha='center', fontsize=10)
+            
             
             fig.text(0.5, 0.10, 
                     f"Reference CV - {embedding_clean}: {reference_cv_accuracy:.3f}±{reference_cv_std:.3f}  |  "
@@ -337,6 +367,10 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             # Generate output filename
             embedding_name = embedding_key.replace('X_', '').lower()
             output_pdf = f"tsne_plot_cross_validated_final_{base_filename}_{embedding_name}.pdf"
+            
+            if embedding_key == 'X_pca':
+                print("Using Pavlin's method for PCA embedding and plotting the results")
+                output_pdf = f"tsne_plot_cross_validated_final_{base_filename}_pavlin_plot.pdf"
             
             # Save plot
             plt.savefig(output_pdf, dpi=600, bbox_inches="tight", transparent=True)
@@ -368,5 +402,3 @@ if __name__ == "__main__":
     # Process single file (uses same file as reference)
     compute_knn_tsne_all("/shared/home/christy.jo.manthara/batch-effect-analysis/output/baron_2016h_xin_2016_preprocessed_with_original_X_uce_adata_X_scvi_X_scanvi_X_uce_test.h5ad", skip_preprocessing=True, n_jobs=1)
     
-    # Process with separate reference file
-    # compute_knn_tsne_all("xin_2016_scGPT.h5ad", reference_file="baron_2016h_scGPT.h5ad", skip_preprocessing=True)
