@@ -73,6 +73,12 @@ def transform_to_baron_format(adata, dataset_name="unknown"):
     }
     adata.uns['year'] = year_mapping.get(dataset_name.lower(), 2016)
     
+    print(f"   📦 Created uns metadata:")
+    print(f"      🔑 name: '{adata.uns['name']}'")
+    print(f"      🔑 organism: '{adata.uns['organism']}'") 
+    print(f"      🔑 tissue: '{adata.uns['tissue']}'")
+    print(f"      🔑 year: {adata.uns['year']}")
+    
     # 6. Ensure obs columns are in the same order as Baron
     desired_order = ['batch_id', 'labels']
     existing_cols = [col for col in desired_order if col in adata.obs.columns]
