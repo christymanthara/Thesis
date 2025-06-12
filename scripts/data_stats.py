@@ -103,6 +103,29 @@ def analyze_adata(adata_path, title=None,  cell_type_column="", batch_column="")
     print(f"📦 Available keys in uns (Unstructured Data):")
     print(list(adata.uns.keys()))
     
+        # Display contents of uns keys
+    print(f"\n📦 Contents of keys in uns (Unstructured Data):")
+    for key, value in adata.uns.items():
+        print(f"🔑 Key: '{key}'")
+        if isinstance(value, (list, np.ndarray)):
+            try:
+                unique_vals = np.unique(value)
+                n_unique = len(unique_vals)
+                if n_unique <= 10:
+                    print(f"    🔹 {n_unique} unique values: {unique_vals.tolist()}")
+                else:
+                    print(f"    🔹 {n_unique} unique values (first 5): {unique_vals[:5].tolist()} ...")
+            except Exception as e:
+                print(f"    ⚠️ Could not determine unique values: {e}")
+        elif isinstance(value, dict):
+            print(f"    📚 Dictionary with {len(value)} keys: {list(value.keys())[:5]}...")
+        elif isinstance(value, str):
+            preview = value[:100] + "..." if len(value) > 100 else value
+            print(f"    📝 String value: '{preview}'")
+        else:
+            print(f"    📦 Type: {type(value).__name__}, Value: {value}")
+
+    
     # Show obsm values if they exist
     if hasattr(adata, 'obsm') and adata.obsm:
         print(f"\n📐 Available keys in obsm (Multi-dimensional Annotations):")
@@ -145,69 +168,89 @@ if __name__ == "__main__":
     # print_adata_stats("../datasets/baron_2016h.h5ad")
     # print_adata_stats("/home/thechristyjo/Documents/Thesis/datasets/baron_2016h.h5ad")
     # print_adata_stats("/home/thechristyjo/Documents/Thesis/datasets/xin_2016.h5ad")
-    # analyze_adata(
-    #     "/home/thechristyjo/Documents/Thesis/datasets/baron_2016h.h5ad",
-    #     title="Baron 2016 Dataset Analysis"
-    # )
+    analyze_adata(
+        "F:/Thesis/Datasets/baron_2016h.h5ad",
+        title="Baron 2016 Dataset Analysis"
+    )
     # analyze_adata(
     #     "/home/thechristyjo/Documents/Thesis/datasets/xin_2016.h5ad",
     #     title="Xin 2016 Dataset Analysis"
     # )
-    analyze_adata(
-        "adata_concat_scGPT_baron_2016h_xin_2016.h5ad",
-        title="Concatenated scGPT Dataset Analysis"
-    )
     # analyze_adata(
-    #     "F:/Thesis/UCE/baron_2016h_uce_adata.h5ad",
+    #     "adata_concat_scGPT_baron_2016h_xin_2016.h5ad",
+    #     title="Concatenated scGPT Dataset Analysis"
+    # )
+    # # analyze_adata(
+    # #     "F:/Thesis/UCE/baron_2016h_uce_adata.h5ad",
+    # #     title="Baron UCE"
+    # # )
+    # analyze_adata(
+    #     "F:/Thesis/Datasets/baron_2016h_uce_adata.h5ad",
     #     title="Baron UCE"
     # )
-    analyze_adata(
-        "F:/Thesis/Datasets/baron_2016h_uce_adata.h5ad",
-        title="Baron UCE"
-    )
     
-    analyze_adata(
-        "F:/Thesis/adata_concat_uce_baron_2016h_uce_adata_xin_2016_uce_adata.h5ad",
-        title="Concatenated UCE Baron and Xin Datasets with uce_adata"
-    )
     
-    analyze_adata(
-        "adata_concat_scGPT_baron_2016h_xin_2016.h5ad",
-        title="Concatenated scGPT Baron and Xin Datasets",
-        batch_column="batch_id",
-        cell_type_column="labels"
-    )
+    # analyze_adata(
+    #     "F:/Thesis/adata_concat_uce_baron_2016h_uce_adata_xin_2016_uce_adata.h5ad",
+    #     title="Concatenated UCE Baron and Xin Datasets with uce_adata"
+    # )
     
-    analyze_adata(
-        "F:/Thesis/adata_concat_scGPT_baron_2016h_xin_2016_X_scvi_X_scanvi_X_scGPT.h5ad",
-        title="Concatenated scGPT Baron and Xin Datasets with embeddings",
-        batch_column="batch_id",
-        cell_type_column="labels"
-    )
+    # analyze_adata(
+    #     "adata_concat_scGPT_baron_2016h_xin_2016.h5ad",
+    #     title="Concatenated scGPT Baron and Xin Datasets",
+    #     batch_column="batch_id",
+    #     cell_type_column="labels"
+    # )
     
-    analyze_adata(
-        "F:/Thesis/baron_2016hxin_2016.h5ad",
-        title="Baron 2016h and Xin 2016 Dataset Analysis",
-        batch_column="batch_id",    
-        cell_type_column="labels"
-    ) #the purest dataset with no embeddings, just the raw data
+    # analyze_adata(
+    #     "F:/Thesis/adata_concat_scGPT_baron_2016h_xin_2016_X_scvi_X_scanvi_X_scGPT.h5ad",
+    #     title="Concatenated scGPT Baron and Xin Datasets with embeddings",
+    #     batch_column="batch_id",
+    #     cell_type_column="labels"
+    # )
+    
+    # analyze_adata(
+    #     "F:/Thesis/baron_2016hxin_2016.h5ad",
+    #     title="Baron 2016h and Xin 2016 Dataset Analysis",
+    #     batch_column="batch_id",    
+    #     cell_type_column="labels"
+     #the purest dataset with no embeddings, just the raw data
     # analyze_adata(
     #     "F:/Thesis/adata_concat_UCE_sample_proc_lung_train_uce_adata_sample_proc_lung_test_uce_adata.h5ad",
     #     title="lung data"
     # )
     
     
+    # analyze_adata(
+    #     "F:/Thesis/baron_2016hxin_2016_uce_adata.h5ad",
+    #     title="Baron 2016h and Xin 2016 Dataset Analysis with UCE",
+    #     batch_column="batch_id",    
+    #     cell_type_column="labels"
+    # )
+    
+    # analyze_adata(
+    #     "baron_2016hxin_2016_uce_adata_X_scvi_X_scanvi_X_scGPT_test.h5ad",
+    #     title="Baron 2016h and Xin 2016 Dataset Analysis with UCE and other embeddings",
+    #     batch_column="batch_id",    
+    #     cell_type_column="labels"
+    # )
+        
+        
     analyze_adata(
-        "F:/Thesis/baron_2016hxin_2016_uce_adata.h5ad",
-        title="Baron 2016h and Xin 2016 Dataset Analysis with UCE",
-        batch_column="batch_id",    
-        cell_type_column="labels"
+        "F:/Thesis/Datasets/rna_seq_muraro.h5ad",
+        title="Muraro RNA-Seq Dataset Analysis",
     )
     
     analyze_adata(
-        "baron_2016hxin_2016_uce_adata_X_scvi_X_scanvi_X_scGPT_test.h5ad",
-        title="Baron 2016h and Xin 2016 Dataset Analysis with UCE and other embeddings",
-        batch_column="batch_id",    
-        cell_type_column="labels"
+        "F:/Thesis/Datasets/rna_seq_segerstolpe.h5ad",
+        title="Segerstolpe RNA-Seq Dataset Analysis",
     )
-        
+    analyze_adata(
+        "F:/Thesis/Datasets/rna_seq_wang.h5ad",
+        title="Wang RNA-Seq Dataset Analysis",
+    )
+    # analyze_adata(
+    #     "F:/Thesis/Datasets/scvelo-pancreas.h5ad",
+    #     title="scVelo Pancreas Dataset Analysis",
+    # )
+    
