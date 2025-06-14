@@ -35,14 +35,33 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
      # Dictionary to store results for table generation     
     results_table = {}          
     
-    # Load the main data file     
-    if skip_preprocessing:         
-        print(f"Loading {file_path} directly (skipping preprocessing)")         
-        adata = anndata.read_h5ad(file_path)     
-    else:         
-        print(f"Loading and preprocessing {file_path}")         
-        # Add preprocessing code here if needed         
-        adata = anndata.read_h5ad(file_path)          
+    # Handle input type - could be file path string or AnnData object
+    if isinstance(file_path, str):
+        file_name = file_path  # Store original path for logging
+        # Load the main data file
+        if skip_preprocessing:
+            print(f"Loading {file_name} directly (skipping preprocessing)")
+            adata = anndata.read_h5ad(file_path)
+        else:
+            print(f"Loading and preprocessing {file_name}")
+            adata = anndata.read_h5ad(file_path)
+            # Add preprocessing code here if needed
+    else:
+        # Input is already an AnnData object
+        adata = file_path
+        if not skip_preprocessing:
+            print("Preprocessing existing AnnData object")
+            # Add preprocessing code here if needed
+        else:
+            print("Using existing AnnData object directly (skipping preprocessing)")      
+        
+    # Initialize metadata variables
+    main_source = None
+    ref_source = None
+    main_tissue = "unknown"
+    ref_tissue = "unknown"
+    main_organism = "unknown"
+    ref_organism = "unknown"    
     
     # Handle data splitting based on source
     if split_by_source and 'source' in adata.obs.columns:
@@ -55,11 +74,43 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             source1, source2 = source_values
             print(f"Splitting data into {source1} and {source2}")
             # Create separate AnnData objects for each source   
-            print("Using {source1} as main data and {source2} as reference")
+            print(f"Using {source1} as main data and {source2} as reference")
             adata_source1 = adata[adata.obs['source'] == source1].copy()
             adata_source2 = adata[adata.obs['source'] == source2].copy()
             
             print(f"Split data: {source1} ({adata_source1.n_obs} cells), {source2} ({adata_source2.n_obs} cells)")
+            
+            # Store the source names for later use
+            main_source = source1
+            ref_source = source2
+            
+            # Extract tissue and organism information
+            # For main source (adata_source1)
+            if 'tissue' in adata_source1.uns.keys():
+                main_tissue = adata_source1.uns['tissue']
+                print(f"Found tissue for {main_source}: {main_tissue}")
+            else:
+                print(f"No tissue key found in uns for {main_source}, using 'unknown'")
+                
+            if 'organism' in adata_source1.uns.keys():
+                main_organism = adata_source1.uns['organism']
+                print(f"Found organism for {main_source}: {main_organism}")
+            else:
+                print(f"No organism key found in uns for {main_source}, using 'unknown'")
+            
+            # For reference source (adata_source2)
+            if 'tissue' in adata_source2.uns.keys():
+                ref_tissue = adata_source2.uns['tissue']
+                print(f"Found tissue for {ref_source}: {ref_tissue}")
+            else:
+                print(f"No tissue key found in uns for {ref_source}, using 'unknown'")
+                
+            if 'organism' in adata_source2.uns.keys():
+                ref_organism = adata_source2.uns['organism']
+                print(f"Found organism for {ref_source}: {ref_organism}")
+            else:
+                print(f"No organism key found in uns for {ref_source}, using 'unknown'")
+            
             
             # Assign one as main adata and other as reference
             adata = adata_source1
@@ -87,9 +138,47 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             else:
                 print(f"Loading and preprocessing reference file {reference_file}")
                 ref_adata = anndata.read_h5ad(reference_file)
+            
+            # Extract metadata from separate files    
+            if 'tissue' in adata.uns.keys():
+                main_tissue = adata.uns['tissue']
+                print(f"Found tissue for main data: {main_tissue}")
+            else:
+                print(f"No tissue key found in uns for main data, using 'unknown'")
+                
+            if 'organism' in adata.uns.keys():
+                main_organism = adata.uns['organism']
+                print(f"Found organism for main data: {main_organism}")
+            else:
+                print(f"No organism key found in uns for main data, using 'unknown'")
+                
+            if 'tissue' in ref_adata.uns.keys():
+                ref_tissue = ref_adata.uns['tissue']
+                print(f"Found tissue for reference data: {ref_tissue}")
+            else:
+                print(f"No tissue key found in uns for reference data, using 'unknown'")
+                
+            if 'organism' in ref_adata.uns.keys():
+                ref_organism = ref_adata.uns['organism']
+                print(f"Found organism for reference data: {ref_organism}")
+            else:
+                print(f"No organism key found in uns for reference data, using 'unknown'")
+            
         else:
             print("Using the same file as input for the  reference")
             ref_adata = adata.copy()
+            # Use same metadata for both since it's the same file
+            if 'tissue' in adata.uns.keys():
+                main_tissue = ref_tissue = adata.uns['tissue']
+                print(f"Found tissue: {main_tissue}")
+            else:
+                print(f"No tissue key found in uns, using 'unknown'")
+                
+            if 'organism' in adata.uns.keys():
+                main_organism = ref_organism = adata.uns['organism']
+                print(f"Found organism: {main_organism}")
+            else:
+                print(f"No organism key found in uns, using 'unknown'")
     
     # Get base filename for output
     base_filename = os.path.splitext(os.path.basename(file_path))[0]
@@ -222,12 +311,34 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             
             # KNN training should filter to reference only
             
-            reference_mask = ref_tsne.obs["source"] == "baron_2016h"
+            if split_by_source and 'source' in ref_tsne.obs.columns:
+                reference_mask = ref_tsne.obs["source"] == ref_source  # Use stored ref_source
+            else:
+                reference_mask = ref_tsne.obs["source"] == "baron_2016h"  # Fallback
+            
+            # Fix the query mask similarly
+            if split_by_source and 'source' in adata_tsne.obs.columns:
+                query_mask = adata_tsne.obs["source"] == main_source  # Use stored main_source
+            else:
+                query_mask = adata_tsne.obs["source"] == "xin_2016"  # Fallback
+            
+            # Debug prints to verify masks
+            print(f"Reference mask sum: {reference_mask.sum()}")
+            print(f"Query mask sum: {query_mask.sum()}")
+            
+            if reference_mask.sum() == 0:
+                print(f"Warning: No reference samples found! Reference source: {ref_source}")
+                print(f"Available sources in ref_tsne: {ref_tsne.obs['source'].unique()}")
+                continue
+                
+            if query_mask.sum() == 0:
+                print(f"Warning: No query samples found! Query source: {main_source}")
+                print(f"Available sources in adata_tsne: {adata_tsne.obs['source'].unique()}")
+                continue
         
             #Cross validation to get a more robust estimate of accuracy
             print(f"Cross-validating KNN on reference embeddings for {embedding_key}...")
             # Extract reference data for cross-validation
-            # reference_embeddings = ref_tsne.obsm[embedding_key][reference_mask]
             reference_embeddings = ref_tsne.obsm[processing_key][reference_mask]
             reference_labels = ref_tsne.obs["labels"][reference_mask].values.astype(str)
 
@@ -242,8 +353,6 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             knn_orig.fit(reference_embeddings, reference_labels)
 
             # Evaluate only on query data
-            query_mask = adata_tsne.obs["source"] == "xin_2016"
-            # query_embeddings = adata_tsne.obsm[embedding_key][query_mask]
             query_embeddings = adata_tsne.obsm[processing_key][query_mask]
             query_labels = adata_tsne.obs["labels"][query_mask].values.astype(str)
             query_orig_accuracy = accuracy_score(knn_orig.predict(query_embeddings), query_labels)
@@ -389,10 +498,19 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
                 if 'X_original_temp' in ref_adata.obsm:
                     del ref_adata.obsm['X_original_temp']
         # Generate summary table
+     # Generate summary table with metadata
     if results_table:
-        create_results_table(results_table, base_filename, reference_file)
-    
-    
+        # Create metadata dictionary
+        metadata = {
+            'main_source': main_source,
+            'ref_source': ref_source,
+            'main_tissue': main_tissue,
+            'ref_tissue': ref_tissue,
+            'main_organism': main_organism,
+            'ref_organism': ref_organism
+        }
+        create_results_table(results_table, main_source, ref_source, base_filename, reference_file, metadata)
+        print("Results table created successfully.")
     print(f"\nCompleted processing all embeddings for {file_path}")
     
 
