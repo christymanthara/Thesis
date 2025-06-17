@@ -368,6 +368,292 @@ def evaluate_batch_mixing(adata, batch_key):
     except Exception as e:
         print(f"Error evaluating batch mixing: {e}")
         
+def plot_batch_specific_labels(adata, batch_key, label_key, batch_values=None, 
+                               use_harmony=True, save_path=None, figsize=(15, 6)):
+    """
+    Plot labels with batch-specific coloring
+    
+    Parameters:
+    -----------
+    adata : AnnData
+        Annotated data matrix
+    batch_key : str
+        Key in adata.obs containing batch information
+    label_key : str
+        Key in adata.obs containing label information
+    batch_values : list or None
+        List of two batch values [batch1, batch2]. If None, uses first two unique values
+    use_harmony : bool
+        Whether to use Harmony-corrected UMAP (default: True)
+    save_path : str or None
+        Path to save the figure
+    figsize : tuple
+        Figure size (width, height)
+    """
+    
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+    
+    # Check if required keys exist
+    if batch_key not in adata.obs.columns:
+        raise ValueError(f"Batch key '{batch_key}' not found in adata.obs")
+    if label_key not in adata.obs.columns:
+        raise ValueError(f"Label key '{label_key}' not found in adata.obs")
+    
+    # Determine which UMAP to use
+    if use_harmony and 'X_umap_harmony' in adata.obsm.keys():
+        umap_coords = adata.obsm['X_umap_harmony']
+        title_suffix = " (Harmony Corrected)"
+    else:
+        umap_coords = adata.obsm['X_umap']
+        title_suffix = " (Original)"
+    
+    # Get batch values
+    unique_batches = adata.obs[batch_key].unique()
+    if batch_values is None:
+        if len(unique_batches) < 2:
+            raise ValueError(f"Need at least 2 batches, found {len(unique_batches)}: {unique_batches}")
+        batch_values = unique_batches[:2]
+        print(f"Using batch values: {batch_values}")
+    
+    batch1, batch2 = batch_values
+    
+    # Create figure
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+    
+    # Get unique labels and create color map
+    unique_labels = adata.obs[label_key].unique()
+    n_labels = len(unique_labels)
+    
+    # Use a colormap with distinct colors
+    import matplotlib.cm as cm
+    colors = cm.tab20(np.linspace(0, 1, n_labels)) if n_labels <= 20 else cm.hsv(np.linspace(0, 1, n_labels))
+    label_color_map = dict(zip(unique_labels, colors))
+    
+    # Plot 1: All labels with normal colors
+    for i, label in enumerate(unique_labels):
+        mask = adata.obs[label_key] == label
+        axes[0].scatter(
+            umap_coords[mask, 0], 
+            umap_coords[mask, 1],
+            c=[label_color_map[label]], 
+            label=label,
+            s=20,
+            alpha=0.7
+        )
+    
+    axes[0].set_title(f'All Labels{title_suffix}')
+    axes[0].set_xlabel('UMAP 1')
+    axes[0].set_ylabel('UMAP 2')
+    axes[0].legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
+    
+    # Plot 2: Batch-specific coloring
+    # First plot batch1 cells in grey
+    batch1_mask = adata.obs[batch_key] == batch1
+    if batch1_mask.sum() > 0:
+        axes[1].scatter(
+            umap_coords[batch1_mask, 0], 
+            umap_coords[batch1_mask, 1],
+            c='lightgrey', 
+            label=f'{batch1} (all labels)',
+            s=20,
+            alpha=0.5
+        )
+    
+    # Then plot batch2 cells with their label colors
+    batch2_mask = adata.obs[batch_key] == batch2
+    if batch2_mask.sum() > 0:
+        batch2_data = adata.obs[batch2_mask]
+        for label in unique_labels:
+            label_mask = batch2_data[label_key] == label
+            if label_mask.sum() > 0:
+                # Get indices in the full dataset
+                full_indices = batch2_data.index[label_mask]
+                full_mask = adata.obs.index.isin(full_indices)
+                
+                axes[1].scatter(
+                    umap_coords[full_mask, 0], 
+                    umap_coords[full_mask, 1],
+                    c=[label_color_map[label]], 
+                    label=f'{batch2}: {label}',
+                    s=20,
+                    alpha=0.7
+                )
+    
+    axes[1].set_title(f'{batch1} (Grey) vs {batch2} (Colored){title_suffix}')
+    axes[1].set_xlabel('UMAP 1')
+    axes[1].set_ylabel('UMAP 2')
+    axes[1].legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
+    
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    # Print some statistics
+    print(f"\nStatistics:")
+    print(f"Total cells: {adata.n_obs}")
+    print(f"Batch '{batch1}': {batch1_mask.sum()} cells")
+    print(f"Batch '{batch2}': {batch2_mask.sum()} cells")
+    print(f"Labels: {list(unique_labels)}")
+    
+    # Show label distribution per batch
+    cross_tab = pd.crosstab(adata.obs[batch_key], adata.obs[label_key])
+    print(f"\nLabel distribution per batch:")
+    print(cross_tab)
+
+
+def plot_comprehensive_batch_analysis(adata, batch_key, label_key, batch_values=None, save_path=None):
+    """
+    Create a comprehensive 4-panel plot showing:
+    1. Labels before correction
+    2. Labels after correction  
+    3. Batch-specific labels (before correction)
+    4. Batch-specific labels (after correction)
+    """
+    
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+    
+    # Check required embeddings
+    has_harmony = 'X_umap_harmony' in adata.obsm.keys()
+    
+    if not has_harmony:
+        print("Warning: Harmony corrected UMAP not found. Computing now...")
+        # You might need to run the harmony correction first
+        return
+    
+    # Get batch values
+    unique_batches = adata.obs[batch_key].unique()
+    if batch_values is None:
+        batch_values = unique_batches[:2]
+    batch1, batch2 = batch_values
+    
+    # Create 2x2 subplot
+    fig, axes = plt.subplots(2, 2, figsize=(20, 16))
+    
+    # Get unique labels and colors
+    unique_labels = adata.obs[label_key].unique()
+    n_labels = len(unique_labels)
+    import matplotlib.cm as cm
+    colors = cm.tab20(np.linspace(0, 1, n_labels)) if n_labels <= 20 else cm.hsv(np.linspace(0, 1, n_labels))
+    label_color_map = dict(zip(unique_labels, colors))
+    
+    # Function to plot labels
+    def plot_labels(ax, umap_coords, title):
+        for label in unique_labels:
+            mask = adata.obs[label_key] == label
+            ax.scatter(
+                umap_coords[mask, 0], 
+                umap_coords[mask, 1],
+                c=[label_color_map[label]], 
+                label=label,
+                s=15,
+                alpha=0.7
+            )
+        ax.set_title(title)
+        ax.set_xlabel('UMAP 1')
+        ax.set_ylabel('UMAP 2')
+    
+    # Function to plot batch-specific labels
+    def plot_batch_specific(ax, umap_coords, title):
+        # Grey for batch1
+        batch1_mask = adata.obs[batch_key] == batch1
+        if batch1_mask.sum() > 0:
+            ax.scatter(
+                umap_coords[batch1_mask, 0], 
+                umap_coords[batch1_mask, 1],
+                c='lightgrey', 
+                s=15,
+                alpha=0.5
+            )
+        
+        # Colors for batch2
+        batch2_mask = adata.obs[batch_key] == batch2
+        if batch2_mask.sum() > 0:
+            batch2_data = adata.obs[batch2_mask]
+            for label in unique_labels:
+                label_mask = batch2_data[label_key] == label
+                if label_mask.sum() > 0:
+                    full_indices = batch2_data.index[label_mask]
+                    full_mask = adata.obs.index.isin(full_indices)
+                    ax.scatter(
+                        umap_coords[full_mask, 0], 
+                        umap_coords[full_mask, 1],
+                        c=[label_color_map[label]], 
+                        s=15,
+                        alpha=0.7
+                    )
+        ax.set_title(title)
+        ax.set_xlabel('UMAP 1')
+        ax.set_ylabel('UMAP 2')
+    
+    # Plot 1: Labels before correction
+    plot_labels(axes[0,0], adata.obsm['X_umap'], 'Labels (Before Correction)')
+    
+    # Plot 2: Labels after correction
+    plot_labels(axes[0,1], adata.obsm['X_umap_harmony'], 'Labels (After Correction)')
+    
+    # Plot 3: Batch-specific before correction
+    plot_batch_specific(axes[1,0], adata.obsm['X_umap'], 
+                       f'{batch1} (Grey) vs {batch2} (Colored) - Before')
+    
+    # Plot 4: Batch-specific after correction
+    plot_batch_specific(axes[1,1], adata.obsm['X_umap_harmony'], 
+                       f'{batch1} (Grey) vs {batch2} (Colored) - After')
+    
+    # Add legends
+    axes[0,0].legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
+    axes[0,1].legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
+    
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    
+    
+def run_comprehensive_analysis(adata, batch_key, label_key):
+    """
+    Run the complete analysis with both batch correction and label visualization
+    """
+    
+    print("Available batch values:", adata.obs[batch_key].unique())
+    print("Available label values:", adata.obs[label_key].unique())
+    
+    # First run harmony correction if not done already
+    if 'X_pca_harmony' not in adata.obsm.keys():
+        print("Running Harmony correction first...")
+        adata = run_harmony_correction_simple(adata, batch_key)
+    
+    # Compute UMAPs if not available
+    if 'X_umap' not in adata.obsm.keys():
+        print("Computing original UMAP...")
+        sc.pp.neighbors(adata, use_rep='X_pca', n_neighbors=10, n_pcs=40)
+        sc.tl.umap(adata, random_state=42)
+    
+    if 'X_umap_harmony' not in adata.obsm.keys():
+        print("Computing Harmony UMAP...")
+        sc.pp.neighbors(adata, use_rep='X_pca_harmony', n_neighbors=10, n_pcs=40, key_added='harmony')
+        sc.tl.umap(adata, neighbors_key='harmony', random_state=42)
+        # Store harmony UMAP separately
+        adata.obsm['X_umap_harmony'] = adata.obsm['X_umap'].copy()
+        # Recompute original UMAP
+        sc.pp.neighbors(adata, use_rep='X_pca', n_neighbors=10, n_pcs=40)
+        sc.tl.umap(adata, random_state=42)
+    
+    # Create the batch-specific label plots
+    print("Creating batch-specific label visualization...")
+    plot_batch_specific_labels(adata, batch_key, label_key, use_harmony=False)
+    plot_batch_specific_labels(adata, batch_key, label_key, use_harmony=True)
+    
+    # Create comprehensive analysis
+    print("Creating comprehensive analysis...")
+    plot_comprehensive_batch_analysis(adata, batch_key, label_key)
+    
+    return adata
 
 
 # Example usage:
@@ -386,6 +672,7 @@ if __name__ == "__main__":
     # You might need to adjust the batch_key based on your data
     # Common batch keys: 'batch', 'sample', 'donor', 'batch_id', 'sample_id'
     batch_key = 'batch'  # Adjust this based on your data
+    label_key = 'labels'  # Adjust this based on your data
     
     if batch_key not in adata.obs.columns:
         print(f"Warning: '{batch_key}' not found in data. Available columns: {list(adata.obs.columns)}")
@@ -409,6 +696,15 @@ if __name__ == "__main__":
         # Save corrected data
         adata_corrected.write('data_harmony_corrected.h5ad')
         
+        # Or run individual plots:
+        # Just the batch-specific label plots
+        plot_batch_specific_labels(adata, batch_key, label_key, use_harmony=False)  # Before correction
+        plot_batch_specific_labels(adata, batch_key, label_key, use_harmony=True)   # After correction
+
+        # Or the full 4-panel analysis
+        plot_comprehensive_batch_analysis(adata, batch_key, label_key)
+
+        
         print("Harmony batch correction pipeline completed successfully!")
         
     except Exception as e:
@@ -430,6 +726,10 @@ if __name__ == "__main__":
             
             # Evaluate batch mixing
             evaluate_batch_mixing(adata_corrected, batch_key=batch_key)
+            
+            #adding the code to print batch-specific labels
+            print("Plotting batch-specific labels... using label_key:", label_key)
+            run_comprehensive_analysis(adata_corrected, batch_key=batch_key, label_key=label_key)
             
             # Save corrected data
             adata_corrected.write('data_harmony_corrected.h5ad')
