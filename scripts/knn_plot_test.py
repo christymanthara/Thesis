@@ -5,13 +5,14 @@ import pandas as pd
 import string
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
-import utils
+import scripts.utils
 import os
 from sklearn.model_selection import cross_val_score
-from knn_plot_table import create_results_table
+from .knn_plot_table import create_results_table
+from . import utils
 
-from compute_tsne_embeddings import compute_tsne_embedding_pavlin
-from compute_tsne_embeddings import compute_tsne_embedding
+from .compute_tsne_embeddings import compute_tsne_embedding_pavlin
+from .compute_tsne_embeddings import compute_tsne_embedding
 
 def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=False, n_jobs=1,split_by_source=True):
     """
@@ -181,8 +182,14 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
                 print(f"No organism key found in uns, using 'unknown'")
     
     # Get base filename for output
-    base_filename = os.path.splitext(os.path.basename(file_path))[0]
-    
+    if isinstance(file_path, str):
+        base_filename = os.path.splitext(os.path.basename(file_path))[0]
+        
+    else:
+        base_filename_ref = ref_adata.obs["batch"].unique()[0] if 'batch' in ref_adata.obs.columns else "merged_data1"
+        adata_name = adata.obs["batch"].unique()[0] if 'batch' in adata.obs.columns else "merged_data2"
+        base_filename = f"{adata_name}_{base_filename_ref}"
+    print(f"Base filename for output: {base_filename}")
     # Get all embedding keys from obsm
     embedding_keys = [key for key in adata.obsm.keys() if key.startswith('X_')]
 
