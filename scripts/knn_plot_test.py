@@ -527,7 +527,9 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             colors_bw = {1: "#666666"}
             print(f"right plot using {viz_method} with tsne_key: {tsne_key} and query_mask source: {main_source}")
             #First plot the reference points in black and white
-            utils.plot(ref_coords, np.ones(len(ref_coords)), ax=ax[1], 
+            # utils.plot(ref_coords, np.ones(len(ref_coords)), ax=ax[1], 
+            #         colors=colors_bw, alpha=0.05, s=3, draw_legend=False)
+            utils.plot(ref_coords, np.ones(len(ref_labels)), ax=ax[1], 
                     colors=colors_bw, alpha=0.05, s=3, draw_legend=False)
             
             

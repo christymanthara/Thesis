@@ -17,7 +17,8 @@ if __name__ == "__main__":
     combined_data = preprocessing.load_and_preprocess_multi_embedder(
         
     file1="F:/Thesis/Datasets/baron_2016h.h5ad", 
-    file2="F:/Thesis/muraro_transformed.h5ad",
+    # file2="F:/Thesis/muraro_transformed.h5ad",
+    file2="F:/Thesis/Datasets/xin_2016.h5ad",
     save=False,          # Saves all files
     split_output=False   # Getting the combined AnnData object
 )
