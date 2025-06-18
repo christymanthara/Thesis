@@ -389,7 +389,7 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             query_tsne_accuracy = accuracy_score(knn_tsne.predict(query_tsne_embeddings), query_labels)
             print(f"Query accuracy using {tsne_key}: {query_tsne_accuracy:.4f}")
             
-        
+            #---------------------------------------------------------------------------------
             # Compute silhouette scores
             silhouette_results = compute_silhouette_scores(
                 reference_embeddings=reference_embeddings,
@@ -408,6 +408,47 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             reference_tsne_sil_score = silhouette_results['reference_tsne_sil_score']
             query_tsne_sil_score = silhouette_results['query_tsne_sil_score']
             
+            #----------------------------------------------------------------------------------
+            # Compute batch effect reduction metrics
+            print(f"Computing batch integration metrics for {embedding_key}...")
+            
+            # Prepare combined data for batch effect analysis
+            combined_embeddings = np.vstack([reference_embeddings, query_embeddings])
+            combined_labels = np.concatenate([reference_labels, query_labels])
+            combined_batches = np.concatenate([
+                np.full(len(reference_labels), ref_source),
+                np.full(len(query_labels), main_source)
+            ])
+            
+            # Compute batch integration metrics
+            batch_metrics = compute_batch_effect_metrics(
+                embeddings=combined_embeddings,
+                cell_types=combined_labels, 
+                batch_labels=combined_batches,
+                embedding_name=embedding_key
+            )
+            
+            # Also compute for t-SNE embeddings
+            combined_tsne_embeddings = np.vstack([reference_tsne_embeddings, query_tsne_embeddings])
+            
+            batch_metrics_tsne = compute_batch_effect_metrics(
+                embeddings=combined_tsne_embeddings,
+                cell_types=combined_labels,
+                batch_labels=combined_batches, 
+                embedding_name=tsne_key
+            )
+            
+            # Extract key metrics
+            integration_score = batch_metrics['integration_score']
+            batch_silhouette = batch_metrics['batch_silhouette']
+            celltype_silhouette = batch_metrics['celltype_silhouette']
+            mixing_entropy = batch_metrics['batch_mixing_entropy']
+            
+            integration_score_tsne = batch_metrics_tsne['integration_score']
+            batch_silhouette_tsne = batch_metrics_tsne['batch_silhouette']
+            
+            #---------------------------------------------------------------------------------------
+            
             embedding_clean = embedding_key.replace('X_', '')
 
             # Special display name for original_X
@@ -416,13 +457,23 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             else:
                 display_name = embedding_clean
 
+            # results_table[f"{display_name}"] = {
+            #     'Reference CV': f"{reference_cv_accuracy:.3f}±{reference_cv_std:.3f}",
+            #     'Query Transfer': f"{query_orig_accuracy:.3f}",
+            #     'Ref Silhouette': f"{reference_sil_score:.3f}",
+            #     'Query Silhouette': f"{query_sil_score:.3f}",
+            #     'Ref t-SNE Sil': f"{reference_tsne_sil_score:.3f}",
+            #     'Query t-SNE Sil': f"{query_tsne_sil_score:.3f}"
+            # }
+            
             results_table[f"{display_name}"] = {
                 'Reference CV': f"{reference_cv_accuracy:.3f}±{reference_cv_std:.3f}",
                 'Query Transfer': f"{query_orig_accuracy:.3f}",
-                'Ref Silhouette': f"{reference_sil_score:.3f}",
-                'Query Silhouette': f"{query_sil_score:.3f}",
-                'Ref t-SNE Sil': f"{reference_tsne_sil_score:.3f}",
-                'Query t-SNE Sil': f"{query_tsne_sil_score:.3f}"
+                'Integration Score': f"{integration_score:.3f}",
+                'Batch Mixing': f"{mixing_entropy:.3f}",
+                'Batch Silhouette': f"{batch_silhouette:.3f}",
+                'CellType Silhouette': f"{celltype_silhouette:.3f}",
+                't-SNE Integration': f"{integration_score_tsne:.3f}"
             }
             
             # Get colors and cell order
@@ -505,13 +556,21 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             viz_label = "UMAP" if 'umap' in embedding_key.lower() else "t-SNE"
             
             
-            fig.text(0.5, 0.10, 
-                f"Reference CV - {embedding_clean}: {reference_cv_accuracy:.3f}±{reference_cv_std:.3f}  |  "
-                f"Query Transfer - {embedding_clean}: {query_orig_accuracy:.3f}\n"
-                f"Ref Sil: {reference_sil_score:.3f}  |  Query Sil: {query_sil_score:.3f}  |  "
-                f"t-SNE Sil: {reference_tsne_sil_score:.3f}/{query_tsne_sil_score:.3f}", 
-                ha='center', fontsize=9, va='center')
+            # fig.text(0.5, 0.10, 
+            #     f"Reference CV - {embedding_clean}: {reference_cv_accuracy:.3f}±{reference_cv_std:.3f}  |  "
+            #     f"Query Transfer - {embedding_clean}: {query_orig_accuracy:.3f}\n"
+            #     f"Ref Sil: {reference_sil_score:.3f}  |  Query Sil: {query_sil_score:.3f}  |  "
+            #     f"t-SNE Sil: {reference_tsne_sil_score:.3f}/{query_tsne_sil_score:.3f}", 
+            #     ha='center', fontsize=9, va='center')
             
+            # Update the plot text to include batch integration info
+            fig.text(0.5, 0.10, 
+                    f"Reference CV: {reference_cv_accuracy:.3f}±{reference_cv_std:.3f}  |  "
+                    f"Query Transfer: {query_orig_accuracy:.3f}\n"
+                    f"Integration Score: {integration_score:.3f}  |  "
+                    f"Batch Sil: {batch_silhouette:.3f} (↓)  |  "
+                    f"CellType Sil: {celltype_silhouette:.3f} (↑)", 
+                    ha='center', fontsize=9, va='center')
             
             # Generate output filename
             embedding_name = embedding_key.replace('X_', '').lower()
