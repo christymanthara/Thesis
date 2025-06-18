@@ -14,6 +14,7 @@ from . import utils
 from .compute_tsne_embeddings import compute_tsne_embedding_pavlin
 from .compute_tsne_embeddings import compute_tsne_embedding
 from .data_utils.silhouette_score import compute_silhouette_scores
+from .data_utils.silhouette_score_re import compute_batch_effect_metrics
 
 def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=False, n_jobs=1,split_by_source=True):
     """
@@ -473,7 +474,8 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
                 'Batch Mixing': f"{mixing_entropy:.3f}",
                 'Batch Silhouette': f"{batch_silhouette:.3f}",
                 'CellType Silhouette': f"{celltype_silhouette:.3f}",
-                't-SNE Integration': f"{integration_score_tsne:.3f}"
+                't-SNE Integration': f"{integration_score_tsne:.3f}",
+                't-SNE Integration Batch score': f"{batch_silhouette_tsne:.3f}"
             }
             
             # Get colors and cell order
