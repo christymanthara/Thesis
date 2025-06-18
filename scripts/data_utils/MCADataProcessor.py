@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 from collections import defaultdict
 import logging
+import re
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -106,8 +107,11 @@ class MCADataProcessor:
         metadata = pd.read_csv(self.csv_file_path, index_col=0)
         
         # Create a mapping from cell barcode to metadata
+        # The DGE files have format like "Bladder_1.CGGCAGAAAGTTATTCCA"
+        # So we need to match: {Tissue}_{Batch}.{Cell.Barcode}
         metadata_dict = {}
         for idx, row in metadata.iterrows():
+            # Create the cell key that matches DGE file format
             cell_key = f"{row['Tissue']}_{row['Batch']}.{row['Cell.Barcode']}"
             metadata_dict[cell_key] = {
                 'batch_id': row['Batch'],
@@ -122,28 +126,105 @@ class MCADataProcessor:
     def read_dge_file(self, file_path):
         """Read a DGE (Digital Gene Expression) file"""
         try:
+            logger.info(f"Reading DGE file: {file_path}")
+            
             if file_path.suffix == '.gz':
-                with gzip.open(file_path, 'rt') as f:
-                    # Read the first line to get cell names
-                    first_line = f.readline().strip()
-                    cell_names = first_line.split('\t')[1:]  # Skip first column (gene names)
-                    
-                    # Read the rest of the file
-                    f.seek(0)
-                    data = pd.read_csv(f, sep='\t', index_col=0)
+                file_handle = gzip.open(file_path, 'rt')
             else:
-                with open(file_path, 'r') as f:
-                    first_line = f.readline().strip()
-                    cell_names = first_line.split('\t')[1:]
+                file_handle = open(file_path, 'r')
+            
+            with file_handle as f:
+                # Read the first line to get cell names
+                first_line = f.readline().strip()
+                
+                # Handle quoted cell names - split by spaces but preserve quoted strings
+                if first_line.startswith('"'):
+                    # Parse quoted strings
+                    import csv
+                    from io import StringIO
+                    # Replace spaces with tabs for proper CSV parsing
+                    csv_line = first_line.replace(' ', '\t')
+                    reader = csv.reader(StringIO(csv_line), delimiter='\t', quotechar='"')
+                    parsed_line = next(reader)
+                    cell_names = parsed_line[1:]  # Skip first column (gene names)
+                else:
+                    # Standard tab or space separated
+                    delimiter = '\t' if '\t' in first_line else ' '
+                    cell_names = first_line.split(delimiter)[1:]
+                
+                # Reset file pointer and read the entire file
+                f.seek(0)
+                
+                # Determine delimiter
+                first_line_check = f.readline()
+                f.seek(0)
+                
+                if '\t' in first_line_check:
+                    delimiter = '\t'
+                else:
+                    delimiter = ' '
+                
+                # Read the data
+                if first_line_check.startswith('"'):
+                    # Handle quoted format - need special parsing
+                    lines = f.readlines()
+                    data_dict = {}
+                    gene_names = []
                     
-                    f.seek(0)
-                    data = pd.read_csv(f, sep='\t', index_col=0)
+                    for line in lines:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        
+                        # Parse quoted line
+                        parts = []
+                        in_quote = False
+                        current_part = ""
+                        
+                        i = 0
+                        while i < len(line):
+                            char = line[i]
+                            if char == '"' and (i == 0 or line[i-1] == ' '):
+                                in_quote = True
+                                i += 1
+                                # Read until closing quote
+                                while i < len(line) and line[i] != '"':
+                                    current_part += line[i]
+                                    i += 1
+                                in_quote = False
+                                parts.append(current_part)
+                                current_part = ""
+                            elif char == ' ' and not in_quote:
+                                if current_part:
+                                    parts.append(current_part)
+                                    current_part = ""
+                            else:
+                                current_part += char
+                            i += 1
+                        
+                        if current_part:
+                            parts.append(current_part)
+                        
+                        if len(parts) >= 2:
+                            gene_name = parts[0]
+                            gene_names.append(gene_name)
+                            expression_values = [float(x) for x in parts[1:]]
+                            data_dict[gene_name] = expression_values
+                    
+                    # Create DataFrame
+                    data = pd.DataFrame(data_dict, index=cell_names).T
+                else:
+                    # Standard format
+                    data = pd.read_csv(f, sep=delimiter, index_col=0)
             
             logger.info(f"Loaded DGE file: {data.shape[0]} genes, {data.shape[1]} cells")
+            logger.info(f"Sample cell names: {list(data.columns[:5])}")
             return data
             
         except Exception as e:
             logger.error(f"Error reading {file_path}: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def process_tissue_data(self, tissue_dirs, metadata_dict):
@@ -155,24 +236,33 @@ class MCADataProcessor:
             
             # Find DGE files in the tissue directory (look for common patterns)
             dge_files = []
-            for pattern in ["*_dge.txt*", "*dge.txt*", "*_expression.txt*", "*.tsv*", "*.csv*"]:
-                dge_files.extend(list(tissue_dir.rglob(pattern)))
+            
+            # List all files to see what we have
+            all_files = list(tissue_dir.rglob("*"))
+            logger.info(f"Files in {tissue_name}: {[f.name for f in all_files]}")
+            
+            # Look for various DGE file patterns
+            for pattern in ["*dge*", "*.txt*", "*.tsv*", "*.csv*", "*expression*", "*matrix*"]:
+                potential_files = list(tissue_dir.rglob(pattern))
+                dge_files.extend(potential_files)
             
             # Remove duplicates and filter out non-data files
             dge_files = list(set(dge_files))
-            dge_files = [f for f in dge_files if not any(exclude in str(f).lower() 
-                                                        for exclude in ['metadata', 'annotation', 'barcode'])]
+            dge_files = [f for f in dge_files if f.is_file() and not any(exclude in str(f).lower() 
+                                                        for exclude in ['metadata', 'annotation', 'barcode', 'feature'])]
+            
+            # Sort by file size (larger files are more likely to be expression matrices)
+            dge_files.sort(key=lambda x: x.stat().st_size, reverse=True)
             
             if not dge_files:
                 logger.warning(f"No DGE files found for {tissue_name}")
-                # Print directory contents for debugging
-                all_files = list(tissue_dir.rglob("*"))
-                logger.info(f"Files in {tissue_name}: {[f.name for f in all_files[:10]]}")
                 continue
+            
+            logger.info(f"Found potential DGE files for {tissue_name}: {[f.name for f in dge_files]}")
             
             # Process each DGE file (batch)
             batch_data = []
-            for dge_file in dge_files:
+            for dge_file in dge_files[:3]:  # Limit to top 3 largest files
                 logger.info(f"Processing file: {dge_file}")
                 
                 # Load the DGE data
@@ -180,43 +270,72 @@ class MCADataProcessor:
                 if dge_data is None:
                     continue
                 
+                # Check if this looks like expression data
+                if dge_data.shape[0] < 100 or dge_data.shape[1] < 10:
+                    logger.warning(f"Skipping {dge_file}: too small to be expression matrix")
+                    continue
+                
                 # Create AnnData object
                 adata = ad.AnnData(X=dge_data.T.values.astype(np.float32))
                 adata.var_names = dge_data.index.astype(str)
                 adata.obs_names = dge_data.columns.astype(str)
                 
+                logger.info(f"Created AnnData: {adata.shape[0]} cells, {adata.shape[1]} genes")
+                logger.info(f"Sample cell names: {list(adata.obs_names[:5])}")
+                
                 # Add metadata
                 obs_metadata = []
                 valid_cells = []
+                matched_cells = 0
                 
                 for cell_name in adata.obs_names:
                     if cell_name in metadata_dict:
                         obs_metadata.append(metadata_dict[cell_name])
                         valid_cells.append(True)
+                        matched_cells += 1
                     else:
-                        # Try to match with tissue prefix
-                        potential_keys = [k for k in metadata_dict.keys() if k.endswith(cell_name)]
-                        if potential_keys:
-                            obs_metadata.append(metadata_dict[potential_keys[0]])
+                        # Try various matching strategies
+                        found_match = False
+                        
+                        # Strategy 1: Remove quotes if present
+                        clean_cell_name = cell_name.strip('"')
+                        if clean_cell_name in metadata_dict:
+                            obs_metadata.append(metadata_dict[clean_cell_name])
                             valid_cells.append(True)
-                        else:
+                            matched_cells += 1
+                            found_match = True
+                        
+                        # Strategy 2: Try to find partial matches
+                        if not found_match:
+                            potential_keys = [k for k in metadata_dict.keys() if clean_cell_name in k or k in clean_cell_name]
+                            if potential_keys:
+                                obs_metadata.append(metadata_dict[potential_keys[0]])
+                                valid_cells.append(True)
+                                matched_cells += 1
+                                found_match = True
+                        
+                        if not found_match:
                             valid_cells.append(False)
+                
+                logger.info(f"Matched {matched_cells} cells out of {len(adata.obs_names)} total cells")
                 
                 # Filter cells with metadata
                 if sum(valid_cells) == 0:
                     logger.warning(f"No cells with metadata found in {dge_file}")
                     continue
                 
+                if sum(valid_cells) < len(adata.obs_names) * 0.1:  # Less than 10% matched
+                    logger.warning(f"Low metadata match rate for {dge_file}: {sum(valid_cells)}/{len(adata.obs_names)}")
+                
                 adata = adata[valid_cells].copy()
                 
                 # Add metadata to obs
-                for i, metadata in enumerate([m for m, v in zip(obs_metadata, valid_cells) if v]):
-                    for key, value in metadata.items():
-                        if key not in adata.obs.columns:
-                            adata.obs[key] = ""
-                        adata.obs.iloc[i, adata.obs.columns.get_loc(key)] = value
+                valid_metadata = [m for m, v in zip(obs_metadata, valid_cells) if v]
+                for key in ['batch_id', 'labels', 'tissue', 'cluster_id']:
+                    adata.obs[key] = [m[key] for m in valid_metadata]
                 
                 batch_data.append(adata)
+                logger.info(f"Added batch with {adata.shape[0]} cells and {adata.shape[1]} genes")
             
             if batch_data:
                 # Concatenate batches for this tissue
