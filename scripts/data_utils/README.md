@@ -1,0 +1,1 @@
+python .\scripts\data_utils\MCADataProcessor.py "F:/Thesis/Datasets/MCA_500more_dge.tar.gz" "F:/Thesis/Datasets/MCA_CellAssignments.csv"                  
