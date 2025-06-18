@@ -5,12 +5,12 @@ import pandas as pd
 import string
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
-import scripts.utils
+# import scripts.utils
 import os
 from sklearn.model_selection import cross_val_score
 from .knn_plot_table import create_results_table
 from . import utils
-
+# import utils
 from .compute_tsne_embeddings import compute_tsne_embedding_pavlin
 from .compute_tsne_embeddings import compute_tsne_embedding
 from .data_utils.silhouette_score import compute_silhouette_scores
@@ -193,6 +193,11 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
         base_filename = f"{adata_name}_{base_filename_ref}"
     print(f"Base filename for output: {base_filename}")
     # Get all embedding keys from obsm
+    embedding_keys = list(set(adata.obsm.keys()))
+    print(f"The embedding keys found in adata.obsm: {embedding_keys}")
+    print(f"The embedding keys found in ref_adata.obsm: {ref_adata.obsm.keys()}")
+    
+    
     embedding_keys = [key for key in adata.obsm.keys() if key.startswith('X_')]
 
     # Check if original_X exists in layers and add it to processing list
@@ -262,13 +267,17 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
         else:
             try:
                 # Check if this is a PCA embedding to use Pavlin's method
-                if 'X_pca' in embedding_key.lower():
+                # if 'X_pca' in embedding_key.lower():
+                if 'X_pca' == embedding_key:
                     print(f"Using Pavlin's method for PCA embedding: {embedding_key}")
                     # Use Pavlin's method for PCA embeddings
                     adata_tsne = compute_tsne_embedding_pavlin(adata_copy, embedding_key=processing_key, 
                                                              output_key=tsne_key, n_jobs=n_jobs)
                     ref_tsne = compute_tsne_embedding_pavlin(ref_copy, embedding_key=processing_key, 
                                                            output_key=tsne_key, n_jobs=n_jobs)
+                    
+                # if the embedding is X_pca then we use also the default method: TD
+                
                 else:
                     # Use default method for all other embeddings
                     adata_tsne = compute_tsne_embedding(adata_copy, embedding_key=processing_key, 
@@ -504,6 +513,7 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             ref_coords = ref_tsne.obsm[tsne_key][reference_mask]
             ref_labels = ref_tsne.obs["labels"][reference_mask]
             
+            print(f"left plot using {viz_method} with tsne_key: {tsne_key} and reference_mask source: {ref_source}")
             utils.plot(ref_coords, ref_labels, ax=ax[0], 
                     title=f"Reference embedding ({viz_method} from {embedding_key})", 
                     colors=colors, s=3, label_order=cell_order,
@@ -515,7 +525,7 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             # Plot transformed samples on the right
             # Create a mask for the reference points to plot them in black and white
             colors_bw = {1: "#666666"}
-            
+            print(f"right plot using {viz_method} with tsne_key: {tsne_key} and query_mask source: {main_source}")
             #First plot the reference points in black and white
             utils.plot(ref_coords, np.ones(len(ref_coords)), ax=ax[1], 
                     colors=colors_bw, alpha=0.05, s=3, draw_legend=False)
@@ -619,5 +629,5 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
 # Example usage
 if __name__ == "__main__":
     # Process single file (uses same file as reference)
-    compute_knn_tsne_all("/shared/home/christy.jo.manthara/batch-effect-analysis/output/baron_2016h_xin_2016_preprocessed_with_original_X_uce_adata_X_scvi_X_scanvi_X_uce_test.h5ad", skip_preprocessing=True, n_jobs=1)
+    compute_knn_tsne_all("F:/Thesis/baron_2016h_xin_2016_preprocessed_uce_adata_X_scvi_X_scanvi_X_uce_test.h5ad", skip_preprocessing=True, n_jobs=1)
     
