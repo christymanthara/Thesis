@@ -13,6 +13,7 @@ from . import utils
 
 from .compute_tsne_embeddings import compute_tsne_embedding_pavlin
 from .compute_tsne_embeddings import compute_tsne_embedding
+from .data_utils.silhouette_score import compute_silhouette_scores
 
 def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=False, n_jobs=1,split_by_source=True):
     """
@@ -328,6 +329,9 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
                 query_mask = adata_tsne.obs["source"] == main_source  # Use stored main_source
             else:
                 query_mask = adata_tsne.obs["source"] == "xin_2016"  # Fallback
+                
+            # print query and reference masks for debugging
+            print(f"Reference source: {ref_source}, Query source: {main_source}")
             
             # Debug prints to verify masks
             print(f"Reference mask sum: {reference_mask.sum()}")
@@ -348,6 +352,7 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             # Extract reference data for cross-validation
             reference_embeddings = ref_tsne.obsm[processing_key][reference_mask]
             reference_labels = ref_tsne.obs["labels"][reference_mask].values.astype(str)
+            print(f"Refference labels unique values: {np.unique(reference_labels)}")
 
             # Cross-validation on reference data
             print(f"Running cross-validation on reference data for {embedding_key}...")
@@ -362,6 +367,7 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             # Evaluate only on query data
             query_embeddings = adata_tsne.obsm[processing_key][query_mask]
             query_labels = adata_tsne.obs["labels"][query_mask].values.astype(str)
+            print(f"Query labels unique values: {np.unique(query_labels)}")
             query_orig_accuracy = accuracy_score(knn_orig.predict(query_embeddings), query_labels)
             print(f"Query accuracy using {embedding_key}: {query_orig_accuracy:.4f}")
             
@@ -384,7 +390,24 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             print(f"Query accuracy using {tsne_key}: {query_tsne_accuracy:.4f}")
             
         
-        
+            # Compute silhouette scores
+            silhouette_results = compute_silhouette_scores(
+                reference_embeddings=reference_embeddings,
+                reference_labels=reference_labels,
+                query_embeddings=query_embeddings, 
+                query_labels=query_labels,
+                reference_tsne_embeddings=reference_tsne_embeddings,
+                query_tsne_embeddings=query_tsne_embeddings,
+                embedding_key=embedding_key,
+                tsne_key=tsne_key
+            )
+            
+            # Extract silhouette scores from results
+            reference_sil_score = silhouette_results['reference_sil_score']
+            query_sil_score = silhouette_results['query_sil_score']
+            reference_tsne_sil_score = silhouette_results['reference_tsne_sil_score']
+            query_tsne_sil_score = silhouette_results['query_tsne_sil_score']
+            
             embedding_clean = embedding_key.replace('X_', '')
 
             # Special display name for original_X
@@ -395,7 +418,11 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
 
             results_table[f"{display_name}"] = {
                 'Reference CV': f"{reference_cv_accuracy:.3f}±{reference_cv_std:.3f}",
-                'Query Transfer': f"{query_orig_accuracy:.3f}"
+                'Query Transfer': f"{query_orig_accuracy:.3f}",
+                'Ref Silhouette': f"{reference_sil_score:.3f}",
+                'Query Silhouette': f"{query_sil_score:.3f}",
+                'Ref t-SNE Sil': f"{reference_tsne_sil_score:.3f}",
+                'Query t-SNE Sil': f"{query_tsne_sil_score:.3f}"
             }
             
             # Get colors and cell order
@@ -417,7 +444,7 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             viz_method = "UMAP" if 'umap' in embedding_key.lower() else "t-SNE"
             
             
-            reference_mask = ref_tsne.obs["source"] == "baron_2016h"
+            reference_mask = ref_tsne.obs["source"] == ref_source
             
             # Plot reference points in colors on the left
             # Plot reference points in colors on the left
@@ -441,7 +468,7 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
                     colors=colors_bw, alpha=0.05, s=3, draw_legend=False)
             
             
-            query_mask = adata_tsne.obs["source"] == "xin_2016"
+            query_mask = adata_tsne.obs["source"] == main_source
             # Then plot the transformed samples with colors
             query_coords = adata_tsne.obsm[tsne_key][query_mask]
             query_labels = adata_tsne.obs["labels"][query_mask]
@@ -456,14 +483,18 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
                 ax_.axis("equal")
             
             # Determine coordinate range from visualization data
-           
-            all_coords = np.vstack([ref_coords, query_coords])
-            coord_min = all_coords.min()
-            coord_max = all_coords.max()
-            coord_range = coord_min - 1, coord_max + 1
-            
-            for ax_ in ax.ravel():
-                ax_.set_xlim(*coord_range), ax_.set_ylim(*coord_range)
+            if len(ref_coords) > 0 and len(query_coords) > 0:
+                all_coords = np.vstack([ref_coords, query_coords])
+                coord_min = all_coords.min()
+                coord_max = all_coords.max()
+                coord_range = coord_min - 1, coord_max + 1
+                
+                for ax_ in ax.ravel():
+                    ax_.set_xlim(*coord_range), ax_.set_ylim(*coord_range)
+                    
+            else:
+                print(f"Warning: Empty coordinate arrays - ref_coords: {len(ref_coords)}, query_coords: {len(query_coords)}")
+                print(f"Skipping coordinate range setting for {embedding_key}")
             
             # Add subplot labels
             for ax_, letter in zip(ax, string.ascii_lowercase): 
@@ -475,9 +506,11 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
             
             
             fig.text(0.5, 0.10, 
-                    f"Reference CV - {embedding_clean}: {reference_cv_accuracy:.3f}±{reference_cv_std:.3f}  |  "
-                    f"Query Transfer - {embedding_clean}: {query_orig_accuracy:.3f}", 
-                    ha='center', fontsize=10)
+                f"Reference CV - {embedding_clean}: {reference_cv_accuracy:.3f}±{reference_cv_std:.3f}  |  "
+                f"Query Transfer - {embedding_clean}: {query_orig_accuracy:.3f}\n"
+                f"Ref Sil: {reference_sil_score:.3f}  |  Query Sil: {query_sil_score:.3f}  |  "
+                f"t-SNE Sil: {reference_tsne_sil_score:.3f}/{query_tsne_sil_score:.3f}", 
+                ha='center', fontsize=9, va='center')
             
             
             # Generate output filename
