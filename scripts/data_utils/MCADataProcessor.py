@@ -3,6 +3,7 @@ import numpy as np
 import scanpy as sc
 import anndata as ad
 import tarfile
+import zipfile
 import gzip
 import os
 import tempfile
@@ -22,7 +23,7 @@ class MCADataProcessor:
         Parameters:
         -----------
         tar_file_path : str
-            Path to the main tar file containing all tissue tar.gz files
+            Path to the main tar file containing all tissue zip files
         csv_file_path : str
             Path to the CSV file with cell metadata
         output_dir : str, optional
@@ -30,42 +31,73 @@ class MCADataProcessor:
         """
         self.tar_file_path = tar_file_path
         self.csv_file_path = csv_file_path
-        self.output_dir = output_dir or tempfile.mkdtemp()
-        self.temp_dir = tempfile.mkdtemp()
         
-        # Create output directory if it doesn't exist
-        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+        # Use current working directory for operations
+        current_dir = Path.cwd()
+        self.output_dir = Path(output_dir) if output_dir else current_dir
+        self.temp_dir = current_dir / "mca_temp_extraction"
         
-        logger.info(f"Initialized MCA processor with output dir: {self.output_dir}")
-        logger.info(f"Temporary directory: {self.temp_dir}")
+        # Create directories if they don't exist
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.temp_dir.mkdir(parents=True, exist_ok=True)
+        
+        logger.info(f"Working directory: {current_dir}")
+        logger.info(f"Output directory: {self.output_dir}")
+        logger.info(f"Temporary extraction directory: {self.temp_dir}")
 
     def extract_tar_files(self):
-        """Extract the main tar file and individual tissue tar.gz files"""
+        """Extract the main tar file and individual tissue zip/gz files"""
         logger.info("Extracting main tar file...")
         
         # Extract main tar file
         with tarfile.open(self.tar_file_path, 'r') as main_tar:
             main_tar.extractall(self.temp_dir)
         
-        # Find all tar.gz files
-        tar_gz_files = list(Path(self.temp_dir).rglob("*.tar.gz"))
-        logger.info(f"Found {len(tar_gz_files)} tissue tar.gz files")
+        # Find all zip files
+        zip_files = list(Path(self.temp_dir).rglob("*.zip"))
+        logger.info(f"Found {len(zip_files)} tissue zip files")
         
-        # Extract each tissue tar.gz file
+        # Find all .gz files (gzipped files, not tar.gz archives)
+        gz_files = list(Path(self.temp_dir).rglob("*.gz"))
+        # Filter out .tar.gz files if any exist
+        gz_files = [f for f in gz_files if not str(f).endswith('.tar.gz')]
+        logger.info(f"Found {len(gz_files)} tissue .gz files")
+        
         tissue_dirs = {}
-        for tar_gz_file in tar_gz_files:
-            tissue_name = tar_gz_file.stem.replace('.tar', '')
+        
+        # Extract each tissue zip file
+        for zip_file in zip_files:
+            tissue_name = zip_file.stem
             tissue_dir = Path(self.temp_dir) / tissue_name
             tissue_dir.mkdir(exist_ok=True)
             
             try:
-                with tarfile.open(tar_gz_file, 'r:gz') as tissue_tar:
-                    tissue_tar.extractall(tissue_dir)
+                with zipfile.ZipFile(zip_file, 'r') as tissue_zip:
+                    tissue_zip.extractall(tissue_dir)
                 tissue_dirs[tissue_name] = tissue_dir
-                logger.info(f"Extracted {tissue_name}")
+                logger.info(f"Extracted {tissue_name} (zip)")
             except Exception as e:
-                logger.warning(f"Failed to extract {tissue_name}: {e}")
+                logger.warning(f"Failed to extract {tissue_name} (zip): {e}")
         
+        # Extract each .gz file (these are individual gzipped files, not archives)
+        for gz_file in gz_files:
+            tissue_name = gz_file.stem  # Remove .gz extension
+            tissue_dir = Path(self.temp_dir) / tissue_name
+            tissue_dir.mkdir(exist_ok=True)
+            
+            try:
+                # Extract the gzipped file
+                with gzip.open(gz_file, 'rb') as f_in:
+                    # Create the uncompressed file in the tissue directory
+                    output_file = tissue_dir / gz_file.stem
+                    with open(output_file, 'wb') as f_out:
+                        f_out.write(f_in.read())
+                tissue_dirs[tissue_name] = tissue_dir
+                logger.info(f"Extracted {tissue_name} (gz)")
+            except Exception as e:
+                logger.warning(f"Failed to extract {tissue_name} (gz): {e}")
+        
+        logger.info(f"Total extracted: {len(tissue_dirs)} tissue directories")
         return tissue_dirs
 
     def load_metadata(self):
@@ -121,11 +153,21 @@ class MCADataProcessor:
         for tissue_name, tissue_dir in tissue_dirs.items():
             logger.info(f"Processing tissue: {tissue_name}")
             
-            # Find DGE files in the tissue directory
-            dge_files = list(tissue_dir.rglob("*_dge.txt*"))
+            # Find DGE files in the tissue directory (look for common patterns)
+            dge_files = []
+            for pattern in ["*_dge.txt*", "*dge.txt*", "*_expression.txt*", "*.tsv*", "*.csv*"]:
+                dge_files.extend(list(tissue_dir.rglob(pattern)))
+            
+            # Remove duplicates and filter out non-data files
+            dge_files = list(set(dge_files))
+            dge_files = [f for f in dge_files if not any(exclude in str(f).lower() 
+                                                        for exclude in ['metadata', 'annotation', 'barcode'])]
             
             if not dge_files:
                 logger.warning(f"No DGE files found for {tissue_name}")
+                # Print directory contents for debugging
+                all_files = list(tissue_dir.rglob("*"))
+                logger.info(f"Files in {tissue_name}: {[f.name for f in all_files[:10]]}")
                 continue
             
             # Process each DGE file (batch)
@@ -297,9 +339,11 @@ class MCADataProcessor:
             logger.error(f"Error in processing pipeline: {e}")
             raise
         finally:
-            # Clean up temporary directory
-            import shutil
-            shutil.rmtree(self.temp_dir, ignore_errors=True)
+            # Clean up temporary directory in current working directory
+            if self.temp_dir.exists():
+                import shutil
+                shutil.rmtree(self.temp_dir, ignore_errors=True)
+                logger.info(f"Cleaned up temporary directory: {self.temp_dir}")
 
     def print_summary(self, adata):
         """Print a summary of the final dataset"""
