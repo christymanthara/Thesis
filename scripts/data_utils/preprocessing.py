@@ -5,6 +5,7 @@ import pandas as pd  # Ensure pandas handles string assignments correctly
 from sklearn import decomposition
 import scipy
 import numpy as np
+from test_save_embeddings import compute_or_load_embedding
 
 def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_basename=True, save=False, split_output=False):
     """
@@ -31,6 +32,7 @@ def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_
     If split_output=False (default):
         AnnData with:
         - .X: Raw counts (for scVI/scANVI)
+        - .layers['original_X']: Copy of original raw counts
         - .layers['normalized']: Log-normalized data (for scGPT, UCE)
         - .layers['standardized']: Standardized data (for traditional methods)
         - .obsm['X_pca']: PCA embeddings (50 components)
@@ -68,12 +70,29 @@ def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_
     if label_column in new.obs and label_column in adata.obs:
         cell_mask = new.obs[label_column].isin(adata.obs[label_column])
         new = new[cell_mask].copy()
+    
+    # Add after the filtering step:
+    print(f"Cells in adata before concat: {adata.n_obs}")
+    print(f"Cells in new before concat: {new.n_obs}")
+    print(f"Cells in new after filtering: {new.n_obs}")
 
+    
     # Concatenate the two datasets
     full = adata.concatenate(new)
+    
+    # Add after concatenation:
+    print(f"Total cells after concat: {full.n_obs}")
+    print(f"Source labels after concat: {full.obs['source'].unique()}")
+    
+    
+    print("Unique source labels in Full adata before other processes:", full.obs["source"].unique())
 
     # Filter genes with at least 1 count
     sc.pp.filter_genes(full, min_counts=1)
+
+    # STORE ORIGINAL X VALUES BEFORE ANY MODIFICATIONS
+    full.layers['original_X'] = full.X.copy()
+    print("Stored original X values in layers['original_X']")
 
     # PRESERVE RAW COUNTS in .X for scVI/scANVI
     # Ensure X contains integers/raw counts
@@ -116,6 +135,8 @@ def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_
 
     # Optional: Add batch information for scVI
     full.obs['batch'] = full.obs['source'].copy()
+    
+    print("Unique source labels in Full adata:", full.obs["source"].unique())
 
     # Save files if requested
     if save:
@@ -137,6 +158,29 @@ def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_
         print(f"Saving split datasets to: {filename1}, {filename2}")
         adata1_save.write_h5ad(filename1)
         adata2_save.write_h5ad(filename2)
+
+    import sys
+    import gc
+    
+    # Clear matplotlib figures
+    if 'matplotlib.pyplot' in sys.modules:
+        import matplotlib.pyplot as plt
+        plt.close('all')
+    
+    # Clear CUDA cache if using GPU
+    if 'torch' in sys.modules:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    
+    # Remove heavy modules
+    modules_to_remove = ['scvi', 'matplotlib', 'seaborn']
+    for module in modules_to_remove:
+        if module in sys.modules:
+            del sys.modules[module]
+    
+    # Force garbage collection
+    gc.collect()
 
     # Return based on split_output flag
     if split_output:
