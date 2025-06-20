@@ -1,0 +1,1 @@
+saving embeddings by themselves
