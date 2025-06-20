@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import pickle
 import json
-from knn_add_excel_table import integrate_excel_export,save_results_to_excel
+from .knn_add_excel_table import integrate_excel_export
 
 def create_results_table(results_table, main_source: str, ref_source: str, base_filename, reference_file=None, metadata=None):
     """
@@ -108,6 +108,8 @@ def create_results_table(results_table, main_source: str, ref_source: str, base_
     df_query, df_reference = create_comprehensive_dataframes(accumulated_results)
     
     # Add this line in your create_results_table function after creating the DataFrames
+    # excel_file = integrate_excel_export_expanded(results_table, 
+    #                                base_filename, source_comparison_key)
     excel_file = integrate_excel_export(df_query, df_reference, accumulated_results, 
                                    base_filename, source_comparison_key)
     
