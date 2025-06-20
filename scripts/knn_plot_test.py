@@ -204,6 +204,7 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
     if 'original_X' in adata.layers.keys():
         embedding_keys.append('original_X')  # Add as special case
         print("Found original_X in layers, adding to processing list")
+    
 
     if not embedding_keys:
         print("No embeddings found in obsm (looking for keys starting with 'X_')")
@@ -612,16 +613,47 @@ def compute_knn_tsne_all(file_path, reference_file=None, skip_preprocessing=Fals
                     del ref_adata.obsm['X_original_temp']
         # Generate summary table
      # Generate summary table with metadata
+     
+    # Get cell counts for main and reference data
+    main_cell_count = adata.n_obs
+    ref_cell_count = ref_adata.n_obs
+
+    print(f"Main data cell count: {main_cell_count}")
+    print(f"Reference data cell count: {ref_cell_count}")
+     
+    if split_by_source and 'source' in adata.obs.columns:
+        # Get cell counts for each source
+        if main_source:
+            main_source_cell_count = (adata.obs['source'] == main_source).sum()
+            print(f"Main source ({main_source}) cell count: {main_source_cell_count}")
+        
+        if ref_source:
+            ref_source_cell_count = (ref_adata.obs['source'] == ref_source).sum()
+            print(f"Reference source ({ref_source}) cell count: {ref_source_cell_count}")
+
+     
     if results_table:
         # Create metadata dictionary
+        
         metadata = {
             'main_source': main_source,
             'ref_source': ref_source,
             'main_tissue': main_tissue,
             'ref_tissue': ref_tissue,
             'main_organism': main_organism,
-            'ref_organism': ref_organism
+            'ref_organism': ref_organism,
+            'main_cell_count': main_cell_count,
+            'ref_cell_count': ref_cell_count
         }
+        
+        # If you want to include source-specific cell counts when available
+        if split_by_source and 'source' in adata.obs.columns:
+            if main_source:
+                metadata['main_source_cell_count'] = (adata.obs['source'] == main_source).sum()
+            if ref_source:
+                metadata['ref_source_cell_count'] = (ref_adata.obs['source'] == ref_source).sum()
+
+        
         create_results_table(results_table, main_source, ref_source, base_filename, reference_file, metadata)
         print("Results table created successfully.")
     print(f"\nCompleted processing all embeddings for {file_path}")
