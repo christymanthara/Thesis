@@ -169,28 +169,19 @@ def compute_knn_tsne_simple(file_path, reference_file=None):
     embedding_clean = embedding_key.replace('X_', '')
 
     # Special display name for original_X
-    if embedding_key == 'original_X':
-        display_name = 'RAW data (original_X)'
-    else:
-        display_name = embedding_clean
-    
-    results_table[f"{display_name}"] = {
-        'Reference CV': f"{cv_accuracy:.3f}",
-        'Query Transfer': f"{accuracy:.3f}",
-            }
-        
-        
-    ref_tissue = ref_adata.uns['tissue']
-    query_tissue = query_adata.uns['tissue']
-    
-    ref_organism = ref_adata.uns['organism']
-    query_organism = query_adata.uns['organism']
-    
-    ref_cell_count = ref_adata.n_obs
-    query_cell_count = query_adata.n_obs
-    
     if results_table:
-        # Create metadata dictionary
+        # Get metadata (fix variable scope issues)
+        source1 = source_values[0] if 'source_values' in locals() and len(source_values) >= 1 else "unknown"
+        source2 = source_values[1] if 'source_values' in locals() and len(source_values) >= 2 else "unknown"
+        
+        ref_tissue = ref_adata.uns.get('tissue', 'unknown')
+        query_tissue = query_adata.uns.get('tissue', 'unknown')
+        
+        ref_organism = ref_adata.uns.get('organism', 'unknown')
+        query_organism = query_adata.uns.get('organism', 'unknown')
+        
+        ref_cell_count = ref_adata.n_obs
+        query_cell_count = query_adata.n_obs
         
         metadata = {
             'ref_source': source1,
@@ -203,10 +194,10 @@ def compute_knn_tsne_simple(file_path, reference_file=None):
             'query_cell_count': query_cell_count
         }
         
-    base_filename= "results_table_"+source1+"_"+source2    
-    create_results_table(results_table, source1, source2, base_filename, metadata=metadata)
-    print("Results table created successfully.")
-    print(f"\nCompleted processing all embeddings for {file_path}")
+        base_filename = f"results_table_{source1}_{source2}"    
+        create_results_table(results_table, source1, source2, base_filename, metadata=metadata)
+        print("Results table created successfully.")
+        print(f"\nCompleted processing all embeddings for {file_path}")
 
     return results
 
