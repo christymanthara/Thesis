@@ -108,10 +108,22 @@ def compute_knn_tsne_simple(file_path, reference_file=None):
         print(f"  Cross-validation accuracy: {cv_accuracy:.3f}")
         print(f"  Transfer accuracy: {accuracy:.3f}")
         
+        # Step 8: Test t-SNE version too
+        tsne_key = f"{embedding_name}_tsne"
+        tsne_accuracy = None
+        if tsne_key in query_adata.obsm and tsne_key in ref_adata.obsm:
+            knn_tsne = KNeighborsClassifier(n_neighbors=10)
+            knn_tsne.fit(ref_adata.obsm[tsne_key], ref_labels)
+            
+            tsne_predictions = knn_tsne.predict(query_adata.obsm[tsne_key])
+            tsne_accuracy = accuracy_score(query_labels, tsne_predictions)
+            print(f"  t-SNE accuracy: {tsne_accuracy:.3f}")
+        
         # Step 8: Store results
         results[embedding_name] = {
             'cv_accuracy': cv_accuracy,
-            'transfer_accuracy': accuracy
+            'transfer_accuracy': accuracy,
+            'tsne_accuracy': tsne_accuracy
         }
         
         # Step 9: Make visualization
@@ -138,7 +150,9 @@ def compute_knn_tsne_simple(file_path, reference_file=None):
         print(f"{embedding}:")
         print(f"  CV: {metrics['cv_accuracy']:.3f}")
         print(f"  Transfer: {metrics['transfer_accuracy']:.3f}")
-    
+        if metrics['tsne_accuracy']:
+            print(f"  t-SNE: {metrics['tsne_accuracy']:.3f}")
+        
     return results
 
 
