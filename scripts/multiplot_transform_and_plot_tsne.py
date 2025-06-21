@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from openTSNE import affinity, TSNEEmbedding
 import utils
 import os
-from data_utils import clustering_metrics
+from data_utils import clustering_metrics_AMI_ARI
 
 from pavlin_preprocess_plot_on_top import run_gene_preprocess_pipeline
 
@@ -70,7 +70,7 @@ def multiplot_transform_tsne(adata_path: str, new_path: str):
     # After creating the embeddings, calculate metrics
     for new_, genes in [(new_250, 250), (new_1000, 1000), (new_full, new_full.shape[1])]:
         # Calculate ARI and AMI using embeddings
-        embedding_metrics = clustering_metrics.calculate_clustering_metrics(
+        embedding_metrics = clustering_metrics_AMI_ARI.calculate_clustering_metrics(
             new_.obsm["X_tsne"], 
             new.obs["labels"]
         )
