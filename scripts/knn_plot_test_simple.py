@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from .compute_tsne_embeddings import compute_tsne_embedding_pavlin
 from .compute_tsne_embeddings import compute_tsne_embedding
 
+from .knn_plot_table_simple import create_results_table
+
 def compute_knn_tsne_simple(file_path, reference_file=None):
     """
     Simplified version: Compare how well different embeddings work for cell type classification
@@ -19,7 +21,7 @@ def compute_knn_tsne_simple(file_path, reference_file=None):
     5. Test how well it predicts cell types on new data
     6. Make plots and save results
     """
-    
+    results_table = {} 
     # Step 1: Load the data
     if isinstance(file_path, str):
         adata = anndata.read_h5ad(file_path)
@@ -27,6 +29,9 @@ def compute_knn_tsne_simple(file_path, reference_file=None):
         # Input is already an AnnData object
         adata = file_path
 
+    print(f"📦 Available keys in uns (Unstructured Data):")
+    print(list(adata.uns.keys()))
+    
     # Step 2: Handle data splitting
     if reference_file:
         # Use separate reference file
@@ -62,6 +67,14 @@ def compute_knn_tsne_simple(file_path, reference_file=None):
     
     # Step 3: Find all embeddings in the data
     # Look for things like X_pca, X_umap, X_scvi, etc.
+    
+    print(f"📦 Available keys in ref adata uns (Unstructured Data):")
+    print(list(ref_adata.uns.keys()))
+    
+    print(f"📦 Available keys in query adata uns (Unstructured Data):")
+    print(list(query_adata.uns.keys()))
+    
+    
     embedding_keys = [key for key in query_adata.obsm.keys() if key.startswith('X_')]
     print(f"Found embeddings: {embedding_keys}")
     
@@ -152,7 +165,49 @@ def compute_knn_tsne_simple(file_path, reference_file=None):
         print(f"  Transfer: {metrics['transfer_accuracy']:.3f}")
         if metrics['tsne_accuracy']:
             print(f"  t-SNE: {metrics['tsne_accuracy']:.3f}")
+    # adding the data for the table creation        
+    embedding_clean = embedding_key.replace('X_', '')
+
+    # Special display name for original_X
+    if embedding_key == 'original_X':
+        display_name = 'RAW data (original_X)'
+    else:
+        display_name = embedding_clean
+    
+    results_table[f"{display_name}"] = {
+        'Reference CV': f"{cv_accuracy:.3f}",
+        'Query Transfer': f"{accuracy:.3f}",
+            }
         
+        
+    ref_tissue = ref_adata.uns['tissue']
+    query_tissue = query_adata.uns['tissue']
+    
+    ref_organism = ref_adata.uns['organism']
+    query_organism = query_adata.uns['organism']
+    
+    ref_cell_count = ref_adata.n_obs
+    query_cell_count = query_adata.n_obs
+    
+    if results_table:
+        # Create metadata dictionary
+        
+        metadata = {
+            'ref_source': source1,
+            'query_source': source2,
+            'ref_tissue': ref_tissue,
+            'query_tissue': query_tissue,
+            'ref_organism': ref_organism,
+            'query_organism': query_organism,
+            'ref_cell_count': ref_cell_count,
+            'query_cell_count': query_cell_count
+        }
+        
+    base_filename= "results_table_"+source1+"_"+source2    
+    create_results_table(results_table, source1, source2, base_filename, metadata=metadata)
+    print("Results table created successfully.")
+    print(f"\nCompleted processing all embeddings for {file_path}")
+
     return results
 
 
