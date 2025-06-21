@@ -5,7 +5,7 @@ import pandas as pd  # Ensure pandas handles string assignments correctly
 from sklearn import decomposition
 import scipy
 import numpy as np
-from test_save_embeddings import compute_or_load_embedding
+from scripts.data_utils.test_save_embeddings import compute_or_load_embedding
 
 def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_basename=True, save=False, split_output=False):
     """
@@ -36,6 +36,7 @@ def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_
         - .layers['normalized']: Log-normalized data (for scGPT, UCE)
         - .layers['standardized']: Standardized data (for traditional methods)
         - .obsm['X_pca']: PCA embeddings (50 components)
+        - .uns: Preserved unstructured data from both datasets
     
     If split_output=True:
         Tuple of (adata1, adata2) - individual datasets with all processing layers
@@ -44,6 +45,16 @@ def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_
     # Load the datasets
     adata = anndata.read_h5ad(file1)
     new = anndata.read_h5ad(file2)
+    
+    print(f"📦 Available keys in adata uns before step1 (Unstructured Data):")
+    print(list(adata.uns.keys()))
+    
+    print(f"📦 Available keys in new uns before step2 (Unstructured Data):")
+    print(list(new.uns.keys()))
+
+    # PRESERVE .uns DATA BEFORE CONCATENATION
+    uns_adata = adata.uns.copy()
+    uns_new = new.uns.copy()
 
     # Debug print to check file paths
     print(f"file1 path: {file1}")
@@ -80,6 +91,12 @@ def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_
     # Concatenate the two datasets
     full = adata.concatenate(new)
     
+    # RESTORE AND MERGE .uns DATA AFTER CONCATENATION
+    full.uns = merge_uns_dictionaries(uns_adata, uns_new, source1_name, source2_name)
+    
+    print(f"📦 Available keys in full.uns after merging:")
+    print(list(full.uns.keys()))
+    
     # Add after concatenation:
     print(f"Total cells after concat: {full.n_obs}")
     print(f"Source labels after concat: {full.obs['source'].unique()}")
@@ -106,7 +123,7 @@ def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_
     sc.pp.normalize_per_cell(adata_norm, counts_per_cell_after=1_000_000)
     sc.pp.log1p(adata_norm)
     
-    # Store normalized data in layers
+    # Store normalized data in layers (preserve .uns in full)
     full.layers['normalized'] = adata_norm.X.copy()
 
     # Create standardized layer for traditional ML methods
@@ -127,7 +144,7 @@ def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_
     # Additional safety check: replace any remaining NaN with 0
     adata_std.X = np.nan_to_num(adata_std.X, nan=0.0, posinf=0.0, neginf=0.0)
     
-    # Store standardized data in layers
+    # Store standardized data in layers (preserve .uns in full)
     full.layers['standardized'] = adata_std.X.copy()
 
     # Compute PCA and store in obsm
@@ -137,6 +154,10 @@ def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_
     full.obs['batch'] = full.obs['source'].copy()
     
     print("Unique source labels in Full adata:", full.obs["source"].unique())
+    
+    # VERIFY .uns IS STILL PRESENT
+    print(f"📦 Final .uns keys in full dataset:")
+    print(list(full.uns.keys()))
 
     # Save files if requested
     if save:
@@ -159,6 +180,7 @@ def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_
         adata1_save.write_h5ad(filename1)
         adata2_save.write_h5ad(filename2)
 
+    # MODIFIED CLEANUP - DON'T DELETE MODULES THAT MIGHT AFFECT .uns
     import sys
     import gc
     
@@ -173,13 +195,7 @@ def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
     
-    # Remove heavy modules
-    modules_to_remove = ['scvi', 'matplotlib', 'seaborn']
-    for module in modules_to_remove:
-        if module in sys.modules:
-            del sys.modules[module]
-    
-    # Force garbage collection
+    # Force garbage collection (but don't delete modules)
     gc.collect()
 
     # Return based on split_output flag
@@ -190,10 +206,51 @@ def load_and_preprocess_multi_embedder(file1, file2, label_column="labels", use_
         return full
 
 
+def merge_uns_dictionaries(uns1, uns2, source1_name, source2_name):
+    """
+    Merge .uns dictionaries from two datasets, handling conflicts appropriately.
+    
+    Parameters:
+    -----------
+    uns1, uns2 : dict
+        The .uns dictionaries from the two datasets
+    source1_name, source2_name : str
+        Names of the source datasets for conflict resolution
+    
+    Returns:
+    --------
+    dict : Merged .uns dictionary
+    """
+    merged_uns = {}
+    
+    # Get all unique keys
+    all_keys = set(uns1.keys()) | set(uns2.keys())
+    
+    for key in all_keys:
+        if key in uns1 and key in uns2:
+            # Both datasets have this key - handle conflicts
+            if uns1[key] == uns2[key]:
+                # Same value - keep it
+                merged_uns[key] = uns1[key]
+            else:
+                # Different values - store both with source prefixes
+                merged_uns[f"{source1_name}_{key}"] = uns1[key]
+                merged_uns[f"{source2_name}_{key}"] = uns2[key]
+                print(f"⚠️  Conflict in .uns['{key}'] - stored as separate keys with source prefixes")
+        elif key in uns1:
+            # Only in first dataset
+            merged_uns[key] = uns1[key]
+        else:
+            # Only in second dataset  
+            merged_uns[key] = uns2[key]
+    
+    return merged_uns
+
+
 def split_by_source(adata, source1_name, source2_name):
     """
     Helper function to split the combined AnnData back into two datasets
-    while preserving all layers and embeddings.
+    while preserving all layers, embeddings, and .uns data.
     """
     mask_source1 = adata.obs["source"] == source1_name
     mask_source2 = adata.obs["source"] == source2_name
@@ -201,8 +258,30 @@ def split_by_source(adata, source1_name, source2_name):
     adata1 = adata[mask_source1].copy()
     adata2 = adata[mask_source2].copy()
     
+    # Restore original .uns data for each dataset if available
+    # Look for source-specific keys in the merged .uns
+    adata1_uns = {}
+    adata2_uns = {}
+    
+    for key, value in adata.uns.items():
+        if key.startswith(f"{source1_name}_"):
+            # Remove prefix and add to adata1
+            original_key = key[len(f"{source1_name}_"):]
+            adata1_uns[original_key] = value
+        elif key.startswith(f"{source2_name}_"):
+            # Remove prefix and add to adata2
+            original_key = key[len(f"{source2_name}_"):]
+            adata2_uns[original_key] = value
+        else:
+            # Common key - add to both
+            adata1_uns[key] = value
+            adata2_uns[key] = value
+    
+    # Update .uns for both datasets
+    adata1.uns.update(adata1_uns)
+    adata2.uns.update(adata2_uns)
+    
     return adata1, adata2
-
 
 # Usage examples for different embedders:
 def prepare_for_scvi(adata):
