@@ -135,9 +135,7 @@ def compute_knn_tsne_simple(file_path, reference_file=None):
             'Query Transfer': f"{accuracy:.3f}",
         }
         
-        # Add t-SNE accuracy if available
-        if tsne_accuracy is not None:
-            results_table[f"{display_name}"]['t-SNE Transfer'] = f"{tsne_accuracy:.3f}"
+        
 
         
         # Step 8: Test t-SNE version too
@@ -150,6 +148,10 @@ def compute_knn_tsne_simple(file_path, reference_file=None):
             tsne_predictions = knn_tsne.predict(query_adata.obsm[tsne_key])
             tsne_accuracy = accuracy_score(query_labels, tsne_predictions)
             print(f"  t-SNE accuracy: {tsne_accuracy:.3f}")
+            
+        # Add t-SNE accuracy if available
+        if tsne_accuracy is not None:
+            results_table[f"{display_name}"]['t-SNE Transfer'] = f"{tsne_accuracy:.3f}"
         
         # Step 8: Store results
         results[embedding_name] = {
