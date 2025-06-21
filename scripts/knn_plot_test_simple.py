@@ -121,6 +121,25 @@ def compute_knn_tsne_simple(file_path, reference_file=None):
         print(f"  Cross-validation accuracy: {cv_accuracy:.3f}")
         print(f"  Transfer accuracy: {accuracy:.3f}")
         
+        embedding_clean = embedding_name.replace('X_', '')
+    
+        # Special display name for original_X
+        if embedding_name == 'original_X':
+            display_name = 'RAW data (original_X)'
+        else:
+            display_name = embedding_clean
+        
+        # Store results for THIS embedding
+        results_table[f"{display_name}"] = {
+            'Reference CV': f"{cv_accuracy:.3f}",
+            'Query Transfer': f"{accuracy:.3f}",
+        }
+        
+        # Add t-SNE accuracy if available
+        if tsne_accuracy is not None:
+            results_table[f"{display_name}"]['t-SNE Transfer'] = f"{tsne_accuracy:.3f}"
+
+        
         # Step 8: Test t-SNE version too
         tsne_key = f"{embedding_name}_tsne"
         tsne_accuracy = None
