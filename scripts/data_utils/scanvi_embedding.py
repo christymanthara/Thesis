@@ -817,6 +817,252 @@ def preprocess_single_adata_for_scanvi_split_visualization_without_plots(file_pa
     
     return adata_copy
 
+
+
+def preprocess_single_adata_for_scanvi_split_visualization_without_plots_with_fingerprint(
+    file_path, label_column="labels", batch_key=None, 
+    n_top_genes=3000, n_latent=30, save_output=False,
+    plot_batch_labels=True, batch_values=None, figsize=(15, 6),
+    embedding_dir="embeddings", force_recompute=False, 
+    fingerprint_column='source'  # New parameter
+):
+    """
+    Loads a single AnnData file, preprocesses it for scANVI, computes latent embeddings, 
+    and returns the processed AnnData object with X_scANVI embeddings.
+    Now supports caching of embeddings with dataset fingerprinting to handle dataset changes.
+    
+    Parameters:
+    -----------
+    file_path : str
+        Path to the h5ad file
+    label_column : str, default "labels"
+        Column name containing cell type labels
+    batch_key : str, optional
+        Column name for batch information. If None, no batch correction is applied
+    n_top_genes : int, default 3000
+        Number of highly variable genes to select
+    n_latent : int, default 30
+        Number of latent dimensions
+    save_output : bool, default False
+        Whether to save the processed file
+    plot_batch_labels : bool, default True
+        Whether to create batch-specific label visualization
+    batch_values : list or None
+        List of two batch values [batch1, batch2] for batch-specific plotting. If None, uses first two unique values
+    figsize : tuple, default (15, 6)
+        Figure size for batch-specific plots (width, height)
+    embedding_dir : str, default "embeddings"
+        Directory to save/load embeddings
+    force_recompute : bool, default False
+        If True, always recompute embeddings even if cached versions exist
+    fingerprint_column : str, default 'source'
+        Column name to use for dataset fingerprinting to detect dataset changes
+        
+    Returns:
+    --------
+    adata : AnnData
+        Processed AnnData object with X_scANVI embeddings and preserved uns data
+    """
+    
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+    import matplotlib.cm as cm
+    
+    # Load dataset
+    if isinstance(file_path, str):
+        adata = anndata.read_h5ad(file_path)
+        dataset_name = os.path.basename(file_path).rsplit('.h5ad', 1)[0]
+        file_path_str = file_path
+    else:
+        adata = file_path
+        dataset_name = "anndata_object"
+        file_path_str = None
+    
+    print(f"Loaded dataset with {adata.n_obs} cells and {adata.n_vars} genes")
+    
+    # Check dataset fingerprint status
+    cache_status = check_embedding_cache_status(
+        adata, dataset_name, "scANVI", embedding_dir, 
+        fingerprint_column, n_top_genes=n_top_genes, 
+        n_latent=n_latent, batch_key=batch_key if batch_key else 'none',
+        label_column=label_column
+    )
+    print(f"Cache status: {'Found' if cache_status['cache_exists'] else 'Not found'}")
+    if fingerprint_column in adata.obs.columns:
+        print(f"Dataset fingerprint based on {fingerprint_column}: {cache_status['dataset_fingerprint']}")
+        print(f"Unique {fingerprint_column} values: {cache_status['unique_values']}")
+    
+    # Store original uns data to preserve it
+    original_uns = adata.uns.copy() if adata.uns else {}
+    
+    # Create parameter dictionary for embedding cache
+    embedding_params = {
+        'n_top_genes': n_top_genes,
+        'n_latent': n_latent,
+        'batch_key': batch_key if batch_key else 'none',
+        'label_column': label_column
+    }
+    
+    # Define embedding computation functions (same as before)
+    def compute_scvi_embedding(adata_input, **params):
+        """Compute scVI embedding"""
+        # Create a working copy to avoid modifying the original
+        adata_work = adata_input.copy()
+        
+        # Use raw counts
+        adata_work.X = adata_work.X.astype(int)
+        adata_work.raw = adata_work.copy()
+        
+        # Select highly variable genes
+        if params['batch_key'] != 'none':
+            sc.pp.highly_variable_genes(
+                adata_work,
+                flavor="seurat_v3",
+                n_top_genes=params['n_top_genes'],
+                batch_key=params['batch_key'],
+                subset=True,
+            )
+        else:
+            sc.pp.highly_variable_genes(
+                adata_work,
+                flavor="seurat_v3",
+                n_top_genes=params['n_top_genes'],
+                subset=True,
+            )
+        
+        print(f"Selected {adata_work.n_vars} highly variable genes")
+        
+        # Setup for scVI
+        scvi._settings.ScviConfig(dl_num_workers=7)
+        if params['batch_key'] != 'none':
+            scvi.model.SCVI.setup_anndata(adata_work, batch_key=params['batch_key'])
+        else:
+            scvi.model.SCVI.setup_anndata(adata_work)
+        
+        # Train scVI model
+        print("Training scVI model for initialization...")
+        vae = scvi.model.SCVI(adata_work, n_layers=2, n_latent=params['n_latent'], gene_likelihood="nb")
+        vae.train()
+        
+        # Get embeddings
+        scvi_embedding = vae.get_latent_representation()
+        return {'embedding': scvi_embedding, 'model': vae, 'adata': adata_work}
+    
+    def compute_scanvi_embedding(adata_input, scvi_result=None, **params):
+        """Compute scANVI embedding, optionally using pre-trained scVI model"""
+        if scvi_result is None:
+            # Need to compute scVI first
+            scvi_result = compute_scvi_embedding(adata_input, **params)
+        
+        adata_processed = scvi_result['adata']
+        vae = scvi_result['model']
+        
+        # Make sure the label column is categorical
+        if params['label_column'] in adata_processed.obs:
+            adata_processed.obs[params['label_column']] = adata_processed.obs[params['label_column']].astype('category')
+            print(f"Found {len(adata_processed.obs[params['label_column']].cat.categories)} unique labels in {params['label_column']}")
+        else:
+            raise ValueError(f"Label column '{params['label_column']}' not found in adata.obs")
+        
+        # Setup scANVI
+        print("Setting up and training scANVI model...")
+        if params['batch_key'] != 'none':
+            scvi.model.SCANVI.setup_anndata(
+                adata_processed, 
+                batch_key=params['batch_key'],
+                labels_key=params['label_column'],
+                unlabeled_category="Unknown"
+            )
+        else:
+            scvi.model.SCANVI.setup_anndata(
+                adata_processed, 
+                labels_key=params['label_column'],
+                unlabeled_category="Unknown"
+            )
+        
+        # Initialize scANVI from the trained scVI model
+        model = scvi.model.SCANVI.from_scvi_model(
+            vae, 
+            adata=adata_processed, 
+            labels_key=params['label_column'], 
+            unlabeled_category="Unknown"
+        )
+        
+        # Train scANVI model
+        model.train(max_epochs=200, early_stopping=True, early_stopping_patience=10)
+        
+        # Get embeddings
+        scanvi_embedding = model.get_latent_representation()
+        return {'embedding': scanvi_embedding, 'model': model, 'adata': adata_processed, 'scvi_embedding': scvi_result['embedding']}
+    
+    # Try to load existing embeddings or compute new ones (WITH FINGERPRINTING)
+    scvi_result = compute_or_load_embedding(
+        adata=adata,
+        dataset_name=dataset_name,
+        embedding_type="scVI",
+        embedding_function=compute_scvi_embedding,
+        embedding_dir=embedding_dir,
+        force_recompute=force_recompute,
+        fingerprint_column=fingerprint_column,  # NEW: Add fingerprint column
+        **embedding_params
+    )
+    
+    scanvi_result = compute_or_load_embedding(
+        adata=adata,
+        dataset_name=dataset_name,
+        embedding_type="scANVI",
+        embedding_function=lambda adata_input, **params: compute_scanvi_embedding(adata_input, scvi_result, **params),
+        embedding_dir=embedding_dir,
+        force_recompute=force_recompute,
+        fingerprint_column=fingerprint_column,  # NEW: Add fingerprint column
+        **embedding_params
+    )
+    
+    # Extract results and preserve uns data (same as before)
+    if isinstance(scanvi_result, dict):
+        adata_copy = scanvi_result['adata']
+        adata_copy.obsm["X_scANVI"] = scanvi_result['embedding']
+        if 'scvi_embedding' in scanvi_result:
+            adata_copy.obsm["X_scVI"] = scanvi_result['scvi_embedding']
+    else:
+        # If loaded from cache, scanvi_result is just the embedding
+        # Create a copy from the original data to preserve structure
+        adata_copy = adata.copy()
+        adata_copy.obsm["X_scANVI"] = scanvi_result
+        
+        # Also add scVI embedding if available
+        if isinstance(scvi_result, dict):
+            adata_copy.obsm["X_scVI"] = scvi_result['embedding']
+        else:
+            adata_copy.obsm["X_scVI"] = scvi_result
+    
+    # Restore original uns data
+    adata_copy.uns = original_uns.copy()
+    
+    # Compute neighborhood graph and UMAP for visualization
+    print("Computing neighbors and UMAP...")
+    sc.pp.neighbors(adata_copy, use_rep="X_scANVI")
+    sc.tl.umap(adata_copy)
+    
+    # Generate visualization plots
+    if batch_key is not None:
+        sc.pl.umap(adata_copy, color=batch_key, title="scANVI integration - Batch")
+    sc.pl.umap(adata_copy, color=label_column, title=f"scANVI integration - {label_column}")
+    
+    # Additional batch-specific visualization if requested
+    if plot_batch_labels and batch_key is not None:
+        create_batch_specific_plots(adata_copy, batch_key, label_column, batch_values, figsize)
+    
+    # Save the processed dataset
+    if save_output and file_path_str:
+        filename = os.path.basename(file_path_str).rsplit('.h5ad', 1)[0]
+        output_file = os.path.join(os.path.dirname(file_path_str), f"{filename}_scanvi.h5ad")
+        print(f"Saving processed file to: {output_file}")
+        adata_copy.write(output_file)
+    
+    return adata_copy
+
 def create_batch_specific_plots(adata, batch_key, label_column, batch_values=None, figsize=(15, 6)):
     """Create batch-specific visualization plots"""
     import matplotlib.pyplot as plt
