@@ -22,11 +22,21 @@ if __name__ == "__main__":
     save=False,          # Saves all files
     split_output=False   # Getting the combined AnnData object
 )
+    
+    print(f"📦 Available keys in uns after step1 (Unstructured Data):")
+    print(list(combined_data.uns.keys()))
+    
     # 2.Adding embeddings using scVI, scANVI, and UCE
     embedded_adata = ce(combined_data)
     
+    print(f"📦 Available keys in uns after step2 (Unstructured Data):")
+    print(list(embedded_adata.uns.keys()))
+    
     # 2.5 Add harmony embedding
     adata_harmony = run_harmony_correction_simple(embedded_adata, batch_key="source")
+    
+    print(f"📦 Available keys in uns after step2.5 (Unstructured Data):")
+    print(list(adata_harmony.uns.keys()))
     
     # 3.Run the knn plot test
     # knn_plot_test.compute_knn_tsne_all(adata_harmony, skip_preprocessing=True, n_jobs=1)
