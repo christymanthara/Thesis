@@ -10,7 +10,7 @@ import matplotlib
 matplotlib.use('Agg')  
 import multiprocessing
 num_workers = multiprocessing.cpu_count()
-from scripts.data_utils.test_save_embeddings import compute_or_load_embedding
+from scripts.data_utils.test_save_embeddings import compute_or_load_embedding, check_embedding_cache_status
 
 def load_and_preprocess_for_scanvi(file1, file2, label_column="labels", use_basename=True,
                                    batch_key="source", n_top_genes=2000, n_latent=30):
