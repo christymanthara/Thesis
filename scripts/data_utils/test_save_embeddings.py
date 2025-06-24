@@ -100,7 +100,7 @@ def cleanup_old_embeddings(dataset_name, embedding_type, embedding_dir="embeddin
 
 def compute_or_load_embedding(adata, dataset_name, embedding_type, embedding_function, 
                              embedding_dir="embeddings", force_recompute=False, 
-                             fingerprint_column='source', cleanup_old=True, **embedding_params):
+                             fingerprint_column='source', cleanup_old=False, **embedding_params):
     """
     Generalized function to compute or load embeddings with dataset fingerprinting.
     
