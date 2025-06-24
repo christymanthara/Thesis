@@ -4,10 +4,11 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import cross_val_score
 import matplotlib.pyplot as plt
-from .compute_tsne_embeddings import compute_tsne_embedding_pavlin
+from .compute_tsne_embeddings import compute_tsne_embedding_pavlin, compute_tsne_transfer_combined_pavlin, compute_tsne_standard_combined
 from .compute_tsne_embeddings import compute_tsne_embedding
 
 from .knn_plot_table_simple import create_results_table
+
 
 def compute_knn_tsne_simple(file_path, reference_file=None):
     """
@@ -233,29 +234,57 @@ def compute_tsne_for_embedding(adata, embedding_key):
     if 'umap' in embedding_key.lower():
         return adata_copy
     
+    # Check if we have multiple sources for transfer learning
+    sources = adata_copy.obs['source'].unique()
+    has_multiple_sources = len(sources) > 1
+    
     # Use your existing t-SNE functions
     if embedding_key == 'X_pca':
-        # Use both methods for PCA
-        # First use Pavlin's method
-        adata_copy = compute_tsne_embedding_pavlin(adata_copy, embedding_key, output_key="X_pca_multiscale_tsne")
-        # Then use default method
-        adata_copy = compute_tsne_embedding(adata_copy, embedding_key, output_key=f"{embedding_key}_tsne")
+        if has_multiple_sources:
+            # Use both methods for PCA when we have multiple sources
+            
+            # Method 1: Transfer learning (Pavlin's method)
+            reference_source = sources[0]  # First source as reference
+            target_source = sources[1]     # Second source as target
+            
+            adata_copy = compute_tsne_transfer_combined_pavlin(
+                adata_copy, 
+                reference_source=reference_source,
+                target_source=target_source,
+                embedding_key=embedding_key, 
+                output_key="X_pca_transfer_tsne"
+            )
+            
+            # Method 2: Standard joint embedding
+            adata_copy = compute_tsne_standard_combined(
+                adata_copy, 
+                embedding_key=embedding_key, 
+                output_key="X_pca_standard_tsne"
+            )
+        else:
+            # Single source - use standard method only
+            adata_copy = compute_tsne_standard_combined(
+                adata_copy, 
+                embedding_key=embedding_key, 
+                output_key=f"{embedding_key}_tsne"
+            )
+        
         return adata_copy
     else:
-        # Use default method for others
-        return compute_tsne_embedding(adata_copy, embedding_key, output_key=f"{embedding_key}_tsne")
+        # Use appropriate method for other embeddings
+        if has_multiple_sources:
+            # For non-PCA embeddings with multiple sources, use standard joint
+            return compute_tsne_standard_combined(
+                adata_copy, 
+                embedding_key=embedding_key, 
+                output_key=f"{embedding_key}_tsne"
+            )
+        else:
+            # For single source, use your original compute_tsne_embedding function
+            # (assuming you still have this function available)
+            return compute_tsne_embedding(adata_copy, embedding_key, output_key=f"{embedding_key}_tsne")
 
 
-import anndata
-import numpy as np
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import cross_val_score
-import matplotlib.pyplot as plt
-from simple_code.compute_tsne_embeddings import compute_tsne_embedding_pavlin
-from simple_code.compute_tsne_embeddings import compute_tsne_embedding
-
-from simple_code.knn_plot_table_simple import create_results_table
 
 def compute_knn_tsne_simple(file_path, reference_file=None):
     """
