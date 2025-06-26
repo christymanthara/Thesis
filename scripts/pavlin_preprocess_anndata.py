@@ -49,7 +49,7 @@ def compute_pca(adata):
     # U, S, V = np.linalg.svd(adata.X, full_matrices=False)
     # U[:, np.sum(V, axis=1) < 0] *= -1
     # adata.obsm["pca"] = np.dot(U, np.diag(S))[:, np.argsort(S)[::-1]][:, :50]
-    pca_components = decomposition.PCA(n_components=50).fit_transform(adata_std.X)
+    pca_components = decomposition.PCA(n_components=50).fit_transform(adata.X)
     adata.obsm["pca"] = pca_components
 
 def compute_tsne(adata):
@@ -85,7 +85,7 @@ def compute_tsne(adata):
     embedding.optimize(n_iter=750, exaggeration=1, momentum=0.8, inplace=True)
     
     # Store result
-    adata.obsm["X_tsne"] = np.array(embedding)
+    adata.obsm["X_pavlin_tsne"] = np.array(embedding)
 
 def process_single_anndata(file_path, save_output=True):
     """
@@ -115,7 +115,7 @@ def process_single_anndata(file_path, save_output=True):
     
     # Compute t-SNE
     compute_tsne(adata)
-    print(f"t-SNE shape: {adata.obsm['X_tsne'].shape}")
+    print(f"t-SNE shape: {adata.obsm['X_pavlin_tsne'].shape}")
     
     # Save if requested
     if save_output:

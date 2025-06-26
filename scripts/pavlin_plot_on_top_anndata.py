@@ -16,7 +16,7 @@ def transform_tsne_single(adata_path: str, new_path: str, results_table=None):
     Parameters:
     -----------
     adata_path : str
-        Path to reference AnnData file (should have X_tsne embedding)
+        Path to reference AnnData file (should have X_pavlin_tsne embedding)
     new_path : str  
         Path to new AnnData file to transform
     results_table : dict, optional
@@ -52,10 +52,10 @@ def transform_tsne_single(adata_path: str, new_path: str, results_table=None):
     print(f"New data shape: {new.shape}")
     
     # Check if reference has t-SNE embedding
-    if "X_tsne" not in adata.obsm:
-        raise ValueError("Reference data must have 'X_tsne' embedding. Run preprocessing pipeline first.")
+    if "X_pavlin_tsne" not in adata.obsm:
+        raise ValueError("Reference data must have 'X_pavlin_tsne' embedding. Run preprocessing pipeline first.")
     
-    print(f"Reference t-SNE shape: {adata.obsm['X_tsne'].shape}")
+    print(f"Reference t-SNE shape: {adata.obsm['X_pavlin_tsne'].shape}")
     
     # Compute affinities for transformation
     print("Computing affinities for transformation...")
@@ -69,7 +69,7 @@ def transform_tsne_single(adata_path: str, new_path: str, results_table=None):
     
     # Create embedding object from reference
     embedding = TSNEEmbedding(
-        adata.obsm["X_tsne"],
+        adata.obsm["X_pavlin_tsne"],
         affinities,
         negative_gradient_method="fft",
         n_jobs=8,
@@ -88,12 +88,12 @@ def transform_tsne_single(adata_path: str, new_path: str, results_table=None):
     
     # Convert embeddings to numpy arrays to ensure HDF5 compatibility
     new.obsm["tsne_init"] = np.array(new.obsm["tsne_init"])
-    new.obsm["X_tsne"] = np.array(new_embedding)
+    new.obsm["X_pavlin_tsne"] = np.array(new_embedding)
     
-    print(f"New data t-SNE shape: {new.obsm['X_tsne'].shape}")
+    print(f"New data t-SNE shape: {new.obsm['X_pavlin_tsne'].shape}")
     
     # Train KNN classifier on reference data
-    embedding_name = "X_tsne"
+    embedding_name = "X_pavlin_tsne"
     ref_adata = adata
     query_adata = new
     ref_embeddings = ref_adata.obsm[embedding_name]
@@ -125,7 +125,7 @@ def transform_tsne_single(adata_path: str, new_path: str, results_table=None):
     try:
         from data_utils import clustering_metrics_AMI_ARI
         embedding_metrics = clustering_metrics_AMI_ARI.calculate_clustering_metrics(
-            new.obsm["X_tsne"], 
+            new.obsm["X_pavlin_tsne"], 
             new.obs["labels"]
         )
         
@@ -183,8 +183,8 @@ def create_transformation_plot(adata, new, adata_path, new_path, metrics=None):
     for label in np.unique(adata.obs["labels"]):
         mask = adata.obs["labels"] == label
         ax1.scatter(
-            adata.obsm["X_tsne"][mask, 0], 
-            adata.obsm["X_tsne"][mask, 1],
+            adata.obsm["X_pavlin_tsne"][mask, 0], 
+            adata.obsm["X_pavlin_tsne"][mask, 1],
             c=[colors.get(label, 'gray')], 
             label=label, 
             s=3, 
@@ -198,8 +198,8 @@ def create_transformation_plot(adata, new, adata_path, new_path, metrics=None):
     for label in np.unique(adata.obs["labels"]):
         mask = adata.obs["labels"] == label
         ax2.scatter(
-            adata.obsm["X_tsne"][mask, 0], 
-            adata.obsm["X_tsne"][mask, 1],
+            adata.obsm["X_pavlin_tsne"][mask, 0], 
+            adata.obsm["X_pavlin_tsne"][mask, 1],
             c=[colors.get(label, 'gray')], 
             s=1, 
             alpha=0.1
@@ -209,8 +209,8 @@ def create_transformation_plot(adata, new, adata_path, new_path, metrics=None):
     for label in np.unique(new.obs["labels"]):
         mask = new.obs["labels"] == label
         ax2.scatter(
-            new.obsm["X_tsne"][mask, 0], 
-            new.obsm["X_tsne"][mask, 1],
+            new.obsm["X_pavlin_tsne"][mask, 0], 
+            new.obsm["X_pavlin_tsne"][mask, 1],
             c=[colors.get(label, 'gray')], 
             label=label, 
             s=12, 
