@@ -5,8 +5,11 @@ import matplotlib.pyplot as plt
 import os
 from openTSNE import TSNEEmbedding
 from openTSNE import affinity
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import cross_val_score
 
-def transform_tsne_single(adata_path: str, new_path: str):
+def transform_tsne_single(adata_path: str, new_path: str, results_table=None):
     """
     Transform new data onto existing t-SNE embedding using all shared genes.
     
@@ -16,7 +19,17 @@ def transform_tsne_single(adata_path: str, new_path: str):
         Path to reference AnnData file (should have X_tsne embedding)
     new_path : str  
         Path to new AnnData file to transform
+    results_table : dict, optional
+        Existing results table to append results to
+    
+    Returns:
+    --------
+    tuple: (transformed_data, updated_results_table)
     """
+    # Initialize results_table if not provided
+    if results_table is None:
+        results_table = {}
+    
     # Load datasets
     adata = anndata.read_h5ad(adata_path)
     new = anndata.read_h5ad(new_path)
@@ -79,6 +92,35 @@ def transform_tsne_single(adata_path: str, new_path: str):
     
     print(f"New data t-SNE shape: {new.obsm['X_tsne'].shape}")
     
+    # Train KNN classifier on reference data
+    embedding_name = "X_tsne"
+    ref_adata = adata
+    query_adata = new
+    ref_embeddings = ref_adata.obsm[embedding_name]
+    ref_labels = ref_adata.obs["labels"].values
+    query_embeddings = query_adata.obsm[embedding_name]
+    query_labels = query_adata.obs["labels"].values
+        
+    knn = KNeighborsClassifier()
+    knn.fit(ref_embeddings, ref_labels)
+    # Predict labels for new data
+    predictions = knn.predict(query_embeddings)
+    accuracy = accuracy_score(query_labels, predictions)
+    
+    cv_scores = cross_val_score(knn, ref_embeddings, ref_labels, cv=5)
+    cv_accuracy = cv_scores.mean()
+    
+    print(f"Results for {embedding_name}:")
+    print(f"  Cross-validation accuracy: {cv_accuracy:.3f}")
+    print(f"  Transfer accuracy: {accuracy:.3f}")
+    
+    # ADD RESULTS TO TABLE (same format as first function)
+    display_name = "Transformed t-SNE"  # You can customize this name
+    results_table[display_name] = {
+        'Reference CV': f"{cv_accuracy:.3f}",
+        'Query Transfer': f"{accuracy:.3f}",
+    }
+
     # Calculate clustering metrics if available
     try:
         from data_utils import clustering_metrics_AMI_ARI
@@ -107,7 +149,7 @@ def transform_tsne_single(adata_path: str, new_path: str):
     # Create visualization
     create_transformation_plot(adata, new, adata_path, new_path, embedding_metrics)
     
-    return new
+    return new, results_table
 
 def create_transformation_plot(adata, new, adata_path, new_path, metrics=None):
     """
