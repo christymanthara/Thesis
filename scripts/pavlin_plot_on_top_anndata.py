@@ -8,6 +8,7 @@ from openTSNE import affinity
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import cross_val_score
+import pandas as pd
 
 def transform_tsne_single(adata_path: str, new_path: str, results_table=None):
     """
@@ -30,9 +31,54 @@ def transform_tsne_single(adata_path: str, new_path: str, results_table=None):
     if results_table is None:
         results_table = {}
     
+    
+    def extract_filename(path):
+        filename = os.path.basename(path)  # Get file name
+        return filename.rsplit('.h5ad', 1)[0]  # Remove the extension
+
+
+    
+    
+    
     # Load datasets
-    adata = anndata.read_h5ad(adata_path)
-    new = anndata.read_h5ad(new_path)
+    if isinstance(adata_path, str):
+        adata = anndata.read_h5ad(adata_path)
+        print(f"Loaded AnnData object from file path")
+        file_path = adata_path
+        adata_name = extract_filename(adata_path)
+
+        # Add source labels 
+        adata.obs["source"] = pd.Categorical([adata_name] * adata.n_obs)
+        
+        
+    else:
+        print("Using provided AnnData object for reference data")
+        adata = adata_path
+        sources = adata.obs["source"]
+        adata_name = sources.unique()[0] if isinstance(sources, pd.Series) else "reference"
+        print(f"Using source label: {adata_name}")
+        
+    if isinstance(new_path, str):
+        print(f"Loading new data from {new_path}")
+        new = anndata.read_h5ad(new_path)
+        file_path = new_path
+        new_name = extract_filename(new_path)
+        print(f"New data name: {new_name}")
+
+        # FIXED: Using new_name and new.n_obs
+        new.obs["source"] = pd.Categorical([new_name] * new.n_obs)
+    else:
+        print("Using provided AnnData object for new data")
+        new = new_path
+        # You should also handle the case where new_path is an AnnData object
+        # and might not have source labels yet
+        if "source" not in new.obs.columns:
+            new_name = "query_data"  # or extract from existing source if available
+            new.obs["source"] = pd.Categorical([new_name] * new.n_obs)
+        
+    
+
+    
     
     print("Original labels in new (before filtering):", new.obs["labels"].value_counts())
     print("Original labels in adata (before filtering):", adata.obs["labels"].value_counts())
@@ -142,12 +188,12 @@ def transform_tsne_single(adata_path: str, new_path: str, results_table=None):
         embedding_metrics = None
     
     # Save transformed data
-    output_filename = f"transformed_{os.path.splitext(os.path.basename(new_path))[0]}.h5ad"
+    output_filename = f"transformed_{embedding_name}_{adata_name}_{new_name}.h5ad"
     new.write_h5ad(output_filename)
     print(f"Transformed data saved as: {output_filename}")
     
     # Create visualization
-    create_transformation_plot(adata, new, adata_path, new_path, embedding_metrics)
+    create_transformation_plot(adata, new, adata_name, new_name, embedding_metrics)
     
     return new, results_table
 
@@ -229,9 +275,9 @@ def create_transformation_plot(adata, new, adata_path, new_path, metrics=None):
     plt.tight_layout()
     
     # Save plot
-    filename1 = os.path.splitext(os.path.basename(adata_path))[0]
-    filename2 = os.path.splitext(os.path.basename(new_path))[0]
-    output_pdf = f"{filename1}-{filename2}-transformation.pdf"
+    # filename1 = os.path.splitext(os.path.basename(adata_path))[0]
+    # filename2 = os.path.splitext(os.path.basename(new_path))[0]
+    output_pdf = f"{adata_path}-{new_path}-transformation.pdf"
     
     plt.savefig(output_pdf, format="pdf", bbox_inches="tight", dpi=300)
     print(f"Plot saved as {output_pdf}")

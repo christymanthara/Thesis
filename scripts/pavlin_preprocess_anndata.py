@@ -7,6 +7,7 @@ from openTSNE import affinity
 from openTSNE import initialization
 from os import path
 from sklearn import decomposition
+import pandas as pd
 
 def preprocess_anndata(file_path):
     """
@@ -106,8 +107,15 @@ def process_single_anndata(file_path, save_output=True):
     # Get filename for saving
     file_name = path.splitext(path.basename(file_path))[0]
     
+    
+    
     # Preprocess data
     adata = preprocess_anndata(file_path)
+    
+    # Add source labels (simplified logic since both branches are identical)
+    adata.obs["source"] = pd.Categorical([file_name] * adata.n_obs)
+    
+    
     
     # Compute PCA
     compute_pca(adata)
