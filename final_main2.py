@@ -51,6 +51,12 @@ def run_uce_processing(adata_path, output_dir="../output/",
         print(f"Error: UCE script not found at {uce_script_path}")
         return None
     
+    import anndata as ad
+
+    # Load the AnnData file to extract organism information
+    adata = ad.read_h5ad(adata_path)
+    organism = adata.uns.get('organism', 'human') 
+    
     # Construct the UCE command
     python_executable = sys.executable
     uce_command = [
@@ -59,7 +65,8 @@ def run_uce_processing(adata_path, output_dir="../output/",
         "--filter", "False",
         "--dir", output_dir,
         "--nlayers", str(nlayers),
-        "--model_loc", model_loc
+        "--model_loc", model_loc,
+        "--species", organism,
     ]
     
     try:
