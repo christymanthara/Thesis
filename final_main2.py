@@ -1069,30 +1069,10 @@ def main_robust_uce():
         # SIMPLE MODE: PROCESS TWO SPECIFIC DATASETS
         # =================================================================
         
-        # dataset1_path = "/shared/home/christy.jo.manthara/Datasets/MCA500/mca_output/individual_tissues/Prostate1_dge_txt_Prostate1_dge.h5ad"
-        # dataset2_path = "/shared/home/christy.jo.manthara/Datasets/MCA500/mca_output/individual_tissues/Prostate2_dge_txt_Prostate2_dge.h5ad"
-        
-        #working ovary
-        # dataset1_path = "/shared/home/christy.jo.manthara/Datasets/Ovary1_dge_txt_Ovary1_dge.h5ad"
-        # dataset2_path = "/shared/home/christy.jo.manthara/Datasets/Ovary2_dge_txt_Ovary2_dge.h5ad"
-        # dataset1_path = "/shared/home/ch
-        # o.manthara/Datasets/MCA500/mca_output/individual_tissues/Ovary2_dge_txt_Ovary2_dge.h5ad"
-        
-        # dataset1_path = "/shared/home/christy.jo.manthara/Datasets/MCA500/mca_output/individual_tissues/Uterus1_dge_txt_Uterus1_dge.h5ad"
-        # dataset2_path = "/shared/home/christy.jo.manthara/Datasets/MCA500/mca_output/individual_tissues/Uterus2_dge_txt_Uterus2_dge.h5ad"
-       
-        # this also works
-        # dataset1_path = "/shared/home/christy.jo.manthara/Datasets/MCA500/mca_output/individual_tissues/Ovary1_dge_txt_Ovary1_dge.h5ad"
-        # dataset2_path = "/shared/home/christy.jo.manthara/Datasets/MCA500/mca_output/individual_tissues/Ovary2_dge_txt_Ovary2_dge.h5ad"
-        
-        # dataset1_path = "/shared/home/christy.jo.manthara/Datasets/MCA500/mca_output/individual_tissues/Lung1_dge_txt_Lung1_dge.h5ad"
-        # dataset2_path = "/shared/home/christy.jo.manthara/Datasets/MCA500/mca_output/individual_tissues/Lung2_dge_txt_Lung2_dge.h5ad"
         
         dataset1_path = "/shared/home/christy.jo.manthara/Datasets/Uterus1.h5ad"
         dataset2_path = "/shared/home/christy.jo.manthara/Datasets/Uterus2.h5ad"
         
-        # dataset1_path = "/shared/home/christy.jo.manthara/Datasets/baron_2016h.h5ad"
-        # dataset2_path = "/shared/home/christy.jo.manthara/Datasets/xin_2016.h5ad"
         
         print(f"\n📁 Dataset Configuration:")
         print(f"   - Dataset 1 (Reference): {dataset1_path}")
