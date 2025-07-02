@@ -198,7 +198,17 @@ def analyze_datasets_by_tissue(datasets_dir="../Datasets/"):
             
             # Check if 'tissue' exists in uns
             if 'tissue' in adata.uns:
-                tissue = adata.uns['tissue']
+                tissue_raw = adata.uns['tissue']
+                
+                # Handle numpy arrays and convert to string
+                if isinstance(tissue_raw, np.ndarray):
+                    if tissue_raw.size == 1:
+                        tissue = str(tissue_raw.item())  # Extract single value
+                    else:
+                        tissue = str(tissue_raw[0])  # Take first element if multiple
+                else:
+                    tissue = str(tissue_raw)
+                
                 cell_count = adata.n_obs
                 tissue_groups[tissue].append((str(filepath), cell_count))
                 print(f"File: {filepath.name} | Tissue: {tissue} | Cells: {cell_count}")
@@ -218,6 +228,7 @@ def analyze_datasets_by_tissue(datasets_dir="../Datasets/"):
         tissue_groups[tissue].sort(key=lambda x: x[1], reverse=True)
     
     return dict(tissue_groups)
+
 
 def run_core_pipeline_steps(file1_path, file2_path, 
                            enable_uce=True, 
