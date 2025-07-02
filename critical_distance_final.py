@@ -424,7 +424,9 @@ def run_analysis_example():
     print("Sample CSV file created: 'embedding_comparison.csv'")
     
     # Run the analysis
-    results = analyze_embedding_methods('embedding_comparison.csv', 
+    # results = analyze_embedding_methods('embedding_comparison.csv', 
+    #                                   save_plot='embedding_cd_diagram.png')
+    results = analyze_embedding_methods("/shared/home/christy.jo.manthara/oneliner/knn_reference_cv_results_comprehensive.csv", 
                                       save_plot='embedding_cd_diagram.png')
     return results
 
