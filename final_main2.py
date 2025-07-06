@@ -20,6 +20,7 @@ from simple_code.pavlin_preprocess_anndata import process_single_anndata
 from simple_code.pavlin_plot_on_top_anndata import transform_tsne_single
 # from simple_code.knn_plot_test_integrated_plot import compute_knn_tsne_simple_with_transformation_plots
 from simple_code.knn_plot_test_integrated_plot_met import compute_knn_tsne_simple_with_transformation_plots
+# from simple_code.knn_plot_test_integrated_plot_met2 import compute_knn_tsne_simple_with_transformation_plots #for checking the tsne problem
 
 from anndata import AnnData
 
@@ -229,6 +230,341 @@ def analyze_datasets_by_tissue(datasets_dir="../Datasets/"):
     
     return dict(tissue_groups)
 
+def merge_multiple_results_tables(result_tables_list, pipeline_names=None):
+    """
+    Merge multiple results tables, handling potential conflicts.
+    
+    Args:
+        result_tables_list (list): List of results tables to merge
+        pipeline_names (list): Optional list of pipeline names for conflict resolution
+    
+    Returns:
+        dict: Merged results table
+    """
+    if not result_tables_list:
+        return {}
+    
+    if len(result_tables_list) == 1:
+        return result_tables_list[0].copy() if hasattr(result_tables_list[0], 'copy') else result_tables_list[0]
+    
+    if pipeline_names is None:
+        pipeline_names = [f"pipeline_{i}" for i in range(len(result_tables_list))]
+    
+    merged_table = {}
+    
+    # Track which methods come from which pipelines
+    method_sources = {}
+    
+    for pipeline_idx, (table, pipeline_name) in enumerate(zip(result_tables_list, pipeline_names)):
+        for method_name, metrics in table.items():
+            if method_name in merged_table:
+                # Handle conflict: method exists in multiple pipelines
+                if isinstance(merged_table[method_name], dict) and isinstance(metrics, dict):
+                    # Try to merge metrics if they're dictionaries
+                    merged_table[method_name].update(metrics)
+                else:
+                    # Create pipeline-specific versions
+                    new_method_name = f"{method_name}_{pipeline_name}"
+                    merged_table[new_method_name] = metrics.copy() if hasattr(metrics, 'copy') else metrics
+            else:
+                # New method, add it
+                merged_table[method_name] = metrics.copy() if hasattr(metrics, 'copy') else metrics
+                method_sources[method_name] = pipeline_name
+    
+    return merged_table
+
+def create_cell_type_count_csv(adata, tissue_name, context_name="pipeline", output_dir="../output/", 
+                               append_mode=True, master_csv_name=None):
+    """
+    Create a CSV file with cell type counts for reference and query datasets.
+    Can either create individual CSV files or append to a master CSV file.
+    
+    Parameters:
+    -----------
+    adata : AnnData
+        Combined AnnData object with 'source' column distinguishing datasets
+    tissue_name : str
+        Name of the tissue being analyzed
+    context_name : str
+        Context name for the analysis (e.g., "pipeline", "tissue_iter1")
+    output_dir : str
+        Directory to save the CSV file
+    append_mode : bool
+        If True, append to master CSV file. If False, create individual CSV files
+    master_csv_name : str, optional
+        Name for the master CSV file. If None, uses "master_cell_type_counts.csv"
+        
+    Returns:
+    --------
+    str: Path to the created/updated CSV file, or None if failed
+    """
+    
+    print(f"\n🔍 Creating cell type count analysis for {tissue_name}...")
+    
+    try:
+        # Check if source column exists
+        if 'source' not in adata.obs.columns:
+            print("❌ 'source' column not found in adata.obs")
+            return None
+        
+        # Get unique source values
+        source_values = adata.obs['source'].unique()
+        print(f"Found source values: {source_values}")
+        
+        if len(source_values) != 2:
+            print(f"❌ Expected 2 source values, found {len(source_values)}")
+            return None
+        
+        source1, source2 = source_values
+        print(f"Using {source1} as reference data and {source2} as query data")
+        
+        # Split data
+        ref_adata = adata[adata.obs['source'] == source1].copy()
+        query_adata = adata[adata.obs['source'] == source2].copy()
+        
+        # Determine cell type column (check common column names)
+        cell_type_columns = ['cell_type', 'celltype', 'Cell_type', 'Cell_Type', 
+                           'cell_type_original', 'cell_type_mapped', 'annotation', 'labels']
+        
+        cell_type_col = None
+        for col in cell_type_columns:
+            if col in ref_adata.obs.columns and col in query_adata.obs.columns:
+                cell_type_col = col
+                break
+        
+        if cell_type_col is None:
+            print("❌ No cell type column found in the data")
+            print(f"Available columns: {list(ref_adata.obs.columns)}")
+            return None
+        
+        print(f"Using cell type column: {cell_type_col}")
+        
+        # Get cell type counts for reference
+        ref_counts = ref_adata.obs[cell_type_col].value_counts().to_dict()
+        print(f"Reference ({source1}) has {len(ref_counts)} cell types")
+        
+        # Get cell type counts for query
+        query_counts = query_adata.obs[cell_type_col].value_counts().to_dict()
+        print(f"Query ({source2}) has {len(query_counts)} cell types")
+        
+        # Get all unique cell types
+        all_cell_types = sorted(set(list(ref_counts.keys()) + list(query_counts.keys())))
+        print(f"Total unique cell types: {len(all_cell_types)}")
+        
+        # Create the data structure for CSV
+        cell_type_data = []
+        
+        # Add timestamp for tracking when this analysis was run
+        import datetime
+        analysis_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        for cell_type in all_cell_types:
+            ref_count = ref_counts.get(cell_type, 0)
+            query_count = query_counts.get(cell_type, 0)
+            total_count = ref_count + query_count
+            
+            cell_type_data.append({
+                'analysis_timestamp': analysis_timestamp,
+                'tissue': tissue_name,
+                'context': context_name,
+                'cell_type': cell_type,
+                'reference_dataset': source1,
+                'reference_count': ref_count,
+                'query_dataset': source2,
+                'query_count': query_count,
+                'total_count': total_count,
+                'reference_percentage': (ref_count / (ref_count + query_count) * 100) if (ref_count + query_count) > 0 else 0,
+                'query_percentage': (query_count / (ref_count + query_count) * 100) if (ref_count + query_count) > 0 else 0,
+                'reference_total_cells': ref_adata.n_obs,
+                'query_total_cells': query_adata.n_obs,
+                'comparison_id': f"{tissue_name}_{context_name}_{source1}_vs_{source2}"
+            })
+        
+        # Create DataFrame
+        df = pd.DataFrame(cell_type_data)
+        
+        # Sort by total count (descending)
+        df = df.sort_values('total_count', ascending=False)
+        
+        # Create output directory if it doesn't exist
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        
+        # Determine output file path
+        if append_mode:
+            # Use master CSV file
+            if master_csv_name is None:
+                master_csv_name = "master_cell_type_counts.csv"
+            csv_path = os.path.join(output_dir, master_csv_name)
+            
+            # Check if master file exists
+            if os.path.exists(csv_path):
+                print(f"📝 Appending to existing master CSV: {csv_path}")
+                # Read existing data
+                existing_df = pd.read_csv(csv_path)
+                
+                # Remove any existing entries with the same comparison_id to avoid duplicates
+                existing_df = existing_df[existing_df['comparison_id'] != df['comparison_id'].iloc[0]]
+                
+                # Combine with new data
+                combined_df = pd.concat([existing_df, df], ignore_index=True)
+                
+                # Sort by analysis timestamp (newest first) and then by total count
+                combined_df = combined_df.sort_values(['analysis_timestamp', 'total_count'], 
+                                                    ascending=[False, False])
+                
+                # Save combined data
+                combined_df.to_csv(csv_path, index=False)
+                print(f"✅ Data appended to master CSV. Total comparisons: {len(combined_df['comparison_id'].unique())}")
+                
+            else:
+                print(f"📝 Creating new master CSV: {csv_path}")
+                df.to_csv(csv_path, index=False)
+                print(f"✅ New master CSV created")
+                
+        else:
+            # Create individual CSV file (original behavior)
+            safe_tissue_name = tissue_name.replace(' ', '_').replace('/', '_')
+            safe_context_name = context_name.replace(' ', '_').replace('/', '_')
+            
+            csv_filename = f"cell_type_counts_{safe_tissue_name}_{safe_context_name}.csv"
+            csv_path = os.path.join(output_dir, csv_filename)
+            
+            # Save to CSV
+            df.to_csv(csv_path, index=False)
+            print(f"✅ Individual CSV created: {csv_path}")
+        
+        print(f"   - Total cell types: {len(all_cell_types)}")
+        print(f"   - Reference cells: {ref_adata.n_obs}")
+        print(f"   - Query cells: {query_adata.n_obs}")
+        print(f"   - Total cells: {adata.n_obs}")
+        
+        # Print summary of top cell types
+        print(f"\n📊 Top 5 cell types by total count:")
+        for idx, row in df.head().iterrows():
+            print(f"   {row['cell_type']}: {row['total_count']} cells "
+                  f"({row['reference_count']} ref, {row['query_count']} query)")
+        
+        return csv_path
+        
+    except Exception as e:
+        print(f"❌ Error creating cell type count CSV: {str(e)}")
+        print(f"Error type: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def create_cell_type_count_csv_before_step2(adata_harmony, tissue_name=None, context_name="pipeline", 
+                                           output_dir="../output/", append_mode=True):
+    """
+    Wrapper function to be called before Step 2 in the pipeline.
+    This function handles the case where the adata might not have the 'source' column yet.
+    
+    Parameters:
+    -----------
+    adata_harmony : AnnData
+        The harmonized AnnData object from the pipeline
+    tissue_name : str
+        Name of the tissue being analyzed
+    context_name : str
+        Context name for the analysis
+    output_dir : str
+        Directory to save the CSV file
+    append_mode : bool
+        If True, append to master CSV file
+        
+    Returns:
+    --------
+    str: Path to the created/updated CSV file, or None if failed
+    """
+    
+    print(f"\n🔬 Running cell type count analysis before Step 2...")
+    
+    try:
+        # Extract tissue name from dataset_tissue column if not provided
+        if tissue_name is None:
+            if 'dataset_tissue' in adata_harmony.obs.columns:
+                tissue_names = adata_harmony.obs['dataset_tissue'].unique()
+                if len(tissue_names) == 1:
+                    tissue_name = tissue_names[0]
+                    print(f"📍 Extracted tissue name from dataset_tissue: {tissue_name}")
+                else:
+                    # Multiple tissues found, create a combined name
+                    tissue_name = "_".join(sorted(tissue_names))
+                    print(f"📍 Multiple tissues found, using combined name: {tissue_name}")
+                    print(f"   Individual tissues: {list(tissue_names)}")
+            else:
+                print("⚠️  'dataset_tissue' column not found and no tissue_name provided")
+                print(f"Available columns: {list(adata_harmony.obs.columns)}")
+                tissue_name = "unknown_tissue"
+        
+        print(f"🧬 Using tissue name: {tissue_name}")
+        # Check if 'source' column exists
+        if 'source' not in adata_harmony.obs.columns:
+            print("⚠️  'source' column not found. Checking for dataset metadata...")
+            
+            # Look for alternative source indicators
+            dataset_cols = [col for col in adata_harmony.obs.columns if col.startswith('dataset_')]
+            if dataset_cols:
+                print(f"Found dataset columns: {dataset_cols}")
+                # Use the first dataset column as source
+                source_col = dataset_cols[0]
+                adata_harmony.obs['source'] = adata_harmony.obs[source_col]
+                print(f"Using '{source_col}' as source column")
+            else:
+                print("❌ No source or dataset information found. Cannot proceed with cell type analysis.")
+                return None
+        
+        # Call the main function
+        return create_cell_type_count_csv(
+            adata_harmony, 
+            tissue_name, 
+            context_name, 
+            output_dir, 
+            append_mode=append_mode
+        )
+        
+    except Exception as e:
+        print(f"❌ Error in cell type count analysis before Step 2: {str(e)}")
+        print(f"Error type: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def merge_results_tables(table1, table2):
+    """
+    Merge two results tables, handling potential conflicts.
+    
+    Args:
+        table1 (dict): First results table
+        table2 (dict): Second results table
+    
+    Returns:
+        dict: Merged results table
+    """
+    merged_table = {}
+    
+    # Copy all entries from first table
+    for method_name, metrics in table1.items():
+        merged_table[method_name] = metrics.copy() if hasattr(metrics, 'copy') else metrics
+    
+    # Add entries from second table
+    for method_name, metrics in table2.items():
+        if method_name in merged_table:
+            # If method exists in both, merge the metrics
+            if isinstance(merged_table[method_name], dict) and isinstance(metrics, dict):
+                merged_table[method_name].update(metrics)
+            else:
+                # If not dict, create a combined entry
+                merged_table[f"{method_name}_pipeline2"] = metrics
+        else:
+            # If method is new, add it
+            merged_table[method_name] = metrics.copy() if hasattr(metrics, 'copy') else metrics
+    
+    return merged_table
+
+
 
 def run_core_pipeline_steps(file1_path, file2_path, 
                            enable_uce=True, 
@@ -283,6 +619,7 @@ def run_core_pipeline_steps(file1_path, file2_path,
         'uce_processing': False,
         'uce_knn': False,
         'preprocessing': False,
+        'cell_type_analysis': False,
         'embedding': False,
         'harmony': False,
         'knn_analysis': False,
@@ -491,6 +828,54 @@ def run_core_pipeline_steps(file1_path, file2_path,
             'pipeline_status': pipeline_status,
             'individual_results': individual_results
         }
+
+         # =================================================================
+     # =================================================================
+    # STEP 1.5: CELL TYPE COUNT ANALYSIS
+    # =================================================================
+    print("\n" + "="*60)
+    print("STEP 1.5: CELL TYPE COUNT ANALYSIS")
+    print("="*60)
+    
+    try:
+        # Extract tissue name from dataset_tissue column
+        if 'dataset_tissue' in combined_data.obs.columns:
+            tissue_names = combined_data.obs['dataset_tissue'].unique()
+            if len(tissue_names) == 1:
+                tissue_name = tissue_names[0]
+                print(f"📍 Using tissue name from dataset_tissue: {tissue_name}")
+            else:
+                # Multiple tissues found, create a combined name
+                tissue_name = "_".join(sorted(tissue_names))
+                print(f"📍 Multiple tissues found, using combined name: {tissue_name}")
+                print(f"   Individual tissues: {list(tissue_names)}")
+        else:
+            print("⚠️  'dataset_tissue' column not found in combined_data.obs")
+            print(f"Available columns: {list(combined_data.obs.columns)}")
+            tissue_name = "unknown_tissue"
+        
+        # Run cell type count analysis
+        csv_path = create_cell_type_count_csv_before_step2(
+            combined_data,  # This is your preprocessed data from Step 1
+            tissue_name=tissue_name,
+            context_name=context_name,
+            output_dir="../output/",
+            append_mode=True  # Set to True to append to master CSV
+        )
+        
+        if csv_path:
+            print(f"✅ Cell type count analysis completed: {csv_path}")
+            pipeline_status['cell_type_analysis'] = True
+        else:
+            print("⚠️  Cell type count analysis failed")
+            pipeline_status['cell_type_analysis'] = False
+            
+    except Exception as e:
+        print(f"❌ Cell type count analysis failed: {str(e)}")
+        print(f"Error type: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        pipeline_status['cell_type_analysis'] = False 
 
     # =================================================================
     # STEP 2: ADDING ADDITIONAL EMBEDDINGS
@@ -767,7 +1152,7 @@ def run_core_pipeline_steps(file1_path, file2_path,
         if metadata:
             print(" | ".join([f"{k}: {v}" for k, v in metadata.items()]))
         
-        df_query, df_reference = create_results_table(
+        df_query, df_reference, df_tsne  = create_results_table(
             integrated_results,
             source1, 
             source2, 
@@ -780,6 +1165,9 @@ def run_core_pipeline_steps(file1_path, file2_path,
             print(f"   - Query results shape: {df_query.shape}")
         if df_reference is not None:
             print(f"   - Reference results shape: {df_reference.shape}")
+        if df_tsne is not None:
+            print(f"   - t-SNE results shape: {df_reference.shape}") 
+        
         
         pipeline_status['table_creation'] = True
         
